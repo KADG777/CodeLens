@@ -1,0 +1,146 @@
+[
+  {
+    "id": "pipeline_rename_and_followup",
+    "filename": "pipeline.py",
+    "code": "def process(raw):\n    prepared = raw + 1\n    prediction = prepared * 2\n    preview = prepared\n    return prediction, preview\n",
+    "questions": [
+      "修改代码，去掉 raw 加 1 的偏移，并将 prepared 改名为 normalized。保持函数签名和返回结构；推理计算和预览均使用去掉偏移后的输入。",
+      "我还没有应用你刚才的补丁。请解释原代码与建议方案中的预览和推理分别使用什么数据，不要再给代码。"
+    ],
+    "expected": [
+      "修改定义时同步所有引用，不引入未定义名称；保持 process(raw) 与二元返回结构。",
+      "区分原快照与未应用的建议；说明预览是计算输入，prediction 是其乘 2 的结果；不声称已执行。"
+    ],
+    "model": "deepseek-flash",
+    "source_hash": "b5915b204a30",
+    "turns": [
+      {
+        "question": "修改代码，去掉 raw 加 1 的偏移，并将 prepared 改名为 normalized。保持函数签名和返回结构；推理计算和预览均使用去掉偏移后的输入。",
+        "answer": "按你的要求做最小改动：去掉 `raw + 1` 偏移，把 `prepared` 统一改名为 `normalized`，函数签名与返回结构（`prediction, preview`）保持不变，推理计算和预览都基于去掉偏移后的输入。应用补丁后，`process(3)` 的 `normalized` 为 3，返回 `(6, 3)`；原快照仍是 `(8, 4)`。\n\n**替换原文件 L1–L5**：去掉 +1 偏移，并将 prepared 全部改名为 normalized；prediction 与 preview 均使用 normalized，返回结构不变。\n\n````python\ndef process(raw):\n    normalized = raw\n    prediction = normalized * 2\n    preview = normalized\n    return prediction, preview\n````\n\n**建议验证（未执行）**\n\n1. 对同一输入分别调用原快照与打补丁后的 process，例如 process(3)：原快照返回 (8, 4)，应用补丁后应返回 (6, 3)。\n2. 检查函数签名仍为 process(raw)，返回仍为二元组 (prediction, preview)。\n3. 用边界输入（如 0、负数）确认 normalized 等于 raw，且 prediction 恒为 normalized * 2。\n\n未执行代码或测试，以上行为为静态推演。\n\n若调用方依赖旧的 +1 偏移语义，需要同步调整调用侧。\n\n补丁已通过源码位置与本地语法检查，仅为文本建议；未修改原文件、未运行测试，也未验证识别率。",
+        "status": "completed",
+        "metrics": {
+          "model_calls": 2,
+          "http_attempts": 2,
+          "tool_calls": 0,
+          "prompt_tokens": 2336,
+          "completion_tokens": 423,
+          "elapsed_seconds": 3.13,
+          "stages": [
+            {
+              "stage": "追问生成",
+              "kind": "model",
+              "elapsed_seconds": 2.088,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 1250,
+              "completion_tokens": 350,
+              "status": "completed"
+            },
+            {
+              "stage": "追问本地校验",
+              "kind": "local",
+              "elapsed_seconds": 0.307,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            },
+            {
+              "stage": "追问方案复核",
+              "kind": "model",
+              "elapsed_seconds": 0.729,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 1086,
+              "completion_tokens": 73,
+              "status": "completed"
+            }
+          ]
+        },
+        "checks": [
+          "引用、已知事实冲突与补丁检查完成；不构成一般语义正确性证明。",
+          "修改方案获得模型复核支持，未执行代码或验证效果。"
+        ],
+        "patch_count": 1,
+        "attempts": [
+          {
+            "attempt": 1,
+            "local_status": "passed",
+            "audit_status": "passed",
+            "errors": []
+          }
+        ],
+        "raw_candidates": [
+          {
+            "role": "assistant",
+            "content": "{\"answer\":\"按你的要求做最小改动：去掉 `raw + 1` 偏移，把 `prepared` 统一改名为 `normalized`，函数签名与返回结构（`prediction, preview`）保持不变，推理计算和预览都基于去掉偏移后的输入。应用补丁后，`process(3)` 的 `normalized` 为 3，返回 `(6, 3)`；原快照仍是 `(8, 4)`。\",\"patches\":[{\"line_start\":1,\"line_end\":5,\"original\":\"def process(raw):\\n    prepared = raw + 1\\n    prediction = prepared * 2\\n    preview = prepared\\n    return prediction, preview\",\"replacement\":\"def process(raw):\\n    normalized = raw\\n    prediction = normalized * 2\\n    preview = normalized\\n    return prediction, preview\",\"rationale\":\"去掉 +1 偏移，并将 prepared 全部改名为 normalized；prediction 与 preview 均使用 normalized，返回结构不变。\"}],\"validation_steps\":[\"对同一输入分别调用原快照与打补丁后的 process，例如 process(3)：原快照返回 (8, 4)，应用补丁后应返回 (6, 3)。\",\"检查函数签名仍为 process(raw)，返回仍为二元组 (prediction, preview)。\",\"用边界输入（如 0、负数）确认 normalized 等于 raw，且 prediction 恒为 normalized * 2。\"],\"limitations\":[\"未执行代码或测试，以上行为为静态推演。\",\"若调用方依赖旧的 +1 偏移语义，需要同步调整调用侧。\"]}"
+          },
+          {
+            "role": "assistant",
+            "content": "{\"verdict\":\"supported\",\"reason\":\"组合后代码已去掉 raw+1 偏移，prepared 全部改名为 normalized，prediction 与 preview 均使用 normalized，函数签名和返回结构保持不变；候选对 process(3) 的静态推演 (6,3) 与代码一致，且未声称已执行验证。\"}"
+          }
+        ]
+      },
+      {
+        "question": "我还没有应用你刚才的补丁。请解释原代码与建议方案中的预览和推理分别使用什么数据，不要再给代码。",
+        "answer": "原快照（未修改）中：`prepared = raw + 1`，推理 `prediction = prepared * 2`，预览 `preview = prepared`，两者都基于带 +1 偏移的 `prepared`，返回 `(prediction, preview)`。例如 `process(3)` 得到 `prepared=4`，返回 `(8, 4)`。\n\n建议方案（尚未应用）中：`normalized = raw`，推理 `prediction = normalized * 2`，预览 `preview = normalized`，两者都基于去掉偏移后的 `normalized`，返回结构不变。应用补丁后 `process(3)` 的 `normalized=3`，返回 `(6, 3)`。\n\n关键差别只在输入是否 +1：原快照推理与预览共享同一个偏移后的值；建议方案推理与预览共享同一个未偏移的值，二者仍保持一致，只是数值整体减 1。函数签名和返回结构均未变。\n\n**建议验证（未执行）**\n\n1. 对同一输入分别调用原快照与打补丁后的 process，例如 process(3)：原快照返回 (8, 4)，应用补丁后应返回 (6, 3)。\n2. 检查函数签名仍为 process(raw)，返回仍为二元组 (prediction, preview)。\n3. 用边界输入（如 0、负数）确认 normalized 等于 raw，且 prediction 恒为 normalized * 2。\n\n未执行代码或测试，以上为静态推演。\n\n若调用方依赖旧的 +1 偏移语义，需要同步调整调用侧。\n\n以上依据当前代码快照；未执行代码或验证模型效果。",
+        "status": "completed",
+        "metrics": {
+          "model_calls": 1,
+          "http_attempts": 1,
+          "tool_calls": 0,
+          "prompt_tokens": 1656,
+          "completion_tokens": 353,
+          "elapsed_seconds": 2.15,
+          "stages": [
+            {
+              "stage": "追问生成",
+              "kind": "model",
+              "elapsed_seconds": 2.15,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 1656,
+              "completion_tokens": 353,
+              "status": "completed"
+            },
+            {
+              "stage": "追问本地校验",
+              "kind": "local",
+              "elapsed_seconds": 0.0,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            }
+          ]
+        },
+        "checks": [
+          "引用、已知事实冲突与补丁检查完成；不构成一般语义正确性证明。"
+        ],
+        "patch_count": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "local_status": "passed",
+            "audit_status": "skipped",
+            "errors": []
+          }
+        ],
+        "raw_candidates": [
+          {
+            "role": "assistant",
+            "content": "{\"answer\":\"原快照（未修改）中：`prepared = raw + 1`，推理 `prediction = prepared * 2`，预览 `preview = prepared`，两者都基于带 +1 偏移的 `prepared`，返回 `(prediction, preview)`。例如 `process(3)` 得到 `prepared=4`，返回 `(8, 4)`。\\n\\n建议方案（尚未应用）中：`normalized = raw`，推理 `prediction = normalized * 2`，预览 `preview = normalized`，两者都基于去掉偏移后的 `normalized`，返回结构不变。应用补丁后 `process(3)` 的 `normalized=3`，返回 `(6, 3)`。\\n\\n关键差别只在输入是否 +1：原快照推理与预览共享同一个偏移后的值；建议方案推理与预览共享同一个未偏移的值，二者仍保持一致，只是数值整体减 1。函数签名和返回结构均未变。\",\"validation_steps\":[\"对同一输入分别调用原快照与打补丁后的 process，例如 process(3)：原快照返回 (8, 4)，应用补丁后应返回 (6, 3)。\",\"检查函数签名仍为 process(raw)，返回仍为二元组 (prediction, preview)。\",\"用边界输入（如 0、负数）确认 normalized 等于 raw，且 prediction 恒为 normalized * 2。\"],\"limitations\":[\"未执行代码或测试，以上为静态推演。\",\"若调用方依赖旧的 +1 偏移语义，需要同步调整调用侧。\"]}"
+          }
+        ]
+      }
+    ],
+    "developer_review": {
+      "reviewed": true,
+      "passed": true,
+      "notes": "开发复查两轮输出：第一轮所有 prepared 使用点同步替换为 normalized，保留签名与二元返回；第二轮区分原快照与尚未应用的补丁。未执行建议代码，不是独立质量评审，也没有验证识别准确率。内部失败修正路径由确定性回归测试覆盖，此真实运行没有触发修正。"
+    },
+    "runtime_sha256": "fc1d4a5fd8892f9ea029d533dc485e018e9875d7928b99083c0985ee753d479b"
+  }
+]

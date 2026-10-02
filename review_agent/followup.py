@@ -36,12 +36,20 @@ class FollowupDraft(BaseModel):
     limitations: list[str] = Field(default_factory=list, max_length=4)
 
 
+class FollowupAttempt(BaseModel):
+    attempt: int
+    local_status: Literal["passed", "failed", "skipped"] = "skipped"
+    audit_status: Literal["passed", "failed", "skipped"] = "skipped"
+    errors: list[str] = Field(default_factory=list)
+
+
 class FollowupResult(BaseModel):
     answer: str
     status: Literal["completed", "repaired", "blocked"]
     metrics: Metrics
     checks: list[str] = Field(default_factory=list)
     patch_count: int = 0
+    attempts: list[FollowupAttempt] = Field(default_factory=list)
 
 
 class FollowupAudit(BaseModel):
@@ -58,6 +66,13 @@ AUDIT_SYSTEM = """复核代码修改建议，仅返回 verdict (supported 或 re
 区分有效建议与尚需实验确认的效果，要求给出具体验证步骤；不能要求模型实际训练/执行。
 发现确定错误或未完成要求返回 revise，reason 简短指出错误与必要修改；不要增补无关需求。
 未发现上述问题返回 supported；这只表示模型复核支持，不构成正确性证明。
+context.numbered_source 是程序组合全部补丁后的假设代码，尚未写入或执行；直接检查它，不能再次应用补丁。
+candidate.patches 的 original 和行号、context.report 与 semantic_facts 均基于修改前快照；
+行数改变后不要把旧行号当成组合后行号，旧事实不自动证明新代码正确。
+repair_history 是本轮未展示候选及其失败原因，与用户对话 history 分开；history 为空不代表未尝试内部修正。
+若候选提到上一版补丁，结合 repair_history 核实，不得把未应用的候选说成用户实际代码已改变。
+跟踪组合后完整的定义、使用和数据处理链。预览可以显示中间结果；只有候选声称与推理输入一致时，
+才核对这个承诺是否成立。不要仅因变量改名或预览内容变化而否决，也不要把保留旧变量当作硬性要求。
 """
 
 
@@ -73,6 +88,9 @@ references 只能引用上下文 reference_labels 中的键；没有对应报告
 不要只列方向或以“如果你希望我可以给代码”结束。尽量保留原有算法和接口。
 每个 patch 替换原文件完整行段，original 原样复制该行段（保留缩进），replacement 也保留所需缩进。
 替换必须包含必要的依赖/导入；可以在同一补丁前加入 import。行号以原快照为准，补丁不能重叠。
+修改或删除变量/处理步骤时，检查整个文件的后续使用点，包括推理、返回值、日志与预览，必要时一起替换。
+内部修正始终针对原快照重新给出完整补丁，不能假定上次候选已应用；回答聚焦最终方案，
+不把本轮未展示的失败候选称为用户已经做过的修改。中间图和最终推理输入须明确区分。
 统一多条处理路径时优先提取共同函数，逐项对齐变换；只允许为明确不同的输入域保留必要适配。
 统一训练/推理预处理时，用户未要求改变训练算法，就优先保留训练路径，将推理输入适配到它；
 不要为了统一而把推理端额外的阈值/膨胀强加到训练端。先统一输入极性，再共享缩放归一化。
@@ -421,8 +439,22 @@ def render(draft: FollowupDraft, context: dict, language: str) -> str:
     return "\n\n".join(parts)
 
 
-def audit_patch(model, context: dict, question: str, draft: FollowupDraft) -> list[str]:
+def audit_patch(
+    model, context: dict, question: str, draft: FollowupDraft,
+    request: ReviewInput, repair_history: list[dict],
+) -> list[str]:
     """A compact second look at patch semantics and compliance, not execution."""
+    # Only called after patch ranges/originals/syntax have been checked. Send one
+    # full source: the actual composition, rather than asking the model to apply it.
+    changed = request.code.splitlines()
+    for patch in sorted(draft.patches, key=lambda p: p.line_start, reverse=True):
+        changed[patch.line_start - 1 : patch.line_end] = patch.replacement.splitlines()
+    audit_context = {
+        **context,
+        "numbered_source": "\n".join(f"{i}: {line}" for i, line in enumerate(changed, 1)),
+        "source_basis": "proposed_after_all_patches_not_executed",
+        "report_and_facts_basis": "original_snapshot_before_patches",
+    }
     result = model.complete(
         [
             {
@@ -433,7 +465,10 @@ def audit_patch(model, context: dict, question: str, draft: FollowupDraft) -> li
             {
                 "role": "user",
                 "content": json.dumps(
-                    {"context": context, "question": question, "candidate": draft.model_dump()},
+                    {
+                        "context": audit_context, "question": question,
+                        "candidate": draft.model_dump(), "repair_history": repair_history,
+                    },
                     ensure_ascii=False,
                     separators=(",", ":"),
                 ),
@@ -454,7 +489,8 @@ def run_followup(
 ) -> FollowupResult:
     started = time.perf_counter()
     initial = model.metrics.model_copy(deep=True)
-    stages, checks = [], []
+    stages, checks, attempts, repair_history = [], [], [], []
+    latest_errors = []
     context = followup_context(request, report, history)
     context["require_patch"] = wants_patch(question)
     deterministic = known_fact_answer(context, question)
@@ -487,13 +523,16 @@ def run_followup(
     ]
     answer, status, patch_count = "", "blocked", 0
     for attempt in range(2):
+        attempt_record = FollowupAttempt(attempt=attempt + 1)
+        attempts.append(attempt_record)
         before, t0 = model.metrics.model_copy(deep=True), time.perf_counter()
         call_status = "completed"
         try:
             response = model.complete(messages, json_output=True, max_tokens=3600)
         except ModelError:
             call_status = "failed"
-            checks.append("模型服务未返回可用回答，未展示未校验内容。")
+            latest_errors = ["模型服务未返回可用回答，未展示未校验内容。"]
+            attempt_record.errors = latest_errors
             break
         finally:
             stages.append(
@@ -514,6 +553,7 @@ def run_followup(
                 )
             )
         t0 = time.perf_counter()
+        draft = None
         try:
             draft = FollowupDraft.model_validate_json(response.get("content") or "")
             errors = check_draft(draft, request, context, context["require_patch"])
@@ -521,6 +561,7 @@ def run_followup(
                 errors = preprocessing_conflicts(request, draft, question)
         except (ValidationError, ValueError, TypeError):
             errors = ["回答未符合结构化输出格式。"]
+        attempt_record.local_status = "failed" if errors else "passed"
         stages.append(
             StageMetric(
                 stage="追问本地校验",
@@ -532,9 +573,10 @@ def run_followup(
         if not errors and draft.patches:
             before, t0 = model.metrics.model_copy(deep=True), time.perf_counter()
             try:
-                errors = audit_patch(model, context, question, draft)
+                errors = audit_patch(model, context, question, draft, request, repair_history)
             except ModelError:
                 errors = ["方案复核服务失败，未展示未经复核的补丁。"]
+            attempt_record.audit_status = "failed" if errors else "passed"
             stages.append(
                 StageMetric(
                     stage="追问方案复核",
@@ -552,6 +594,8 @@ def run_followup(
                     },
                 )
             )
+        latest_errors = list(dict.fromkeys(errors))
+        attempt_record.errors = latest_errors
         if not errors:
             answer, patch_count = render(draft, context, request.language), len(draft.patches)
             status = "repaired" if attempt else "completed"
@@ -559,31 +603,52 @@ def run_followup(
             if draft.patches:
                 checks.append("修改方案获得模型复核支持，未执行代码或验证效果。")
             break
-        checks.extend(errors)
         if attempt == 0:
+            repair_history.append({
+                "attempt": attempt + 1,
+                "not_applied": True,
+                "failed_stage": "local" if attempt_record.local_status == "failed" else "audit",
+                "errors": latest_errors,
+                "candidate": draft.model_dump(include={"answer", "patches"}) if draft else None,
+            })
             messages += [
                 {"role": "assistant", "content": response.get("content") or ""},
                 {
                     "role": "user",
                     "content": "此候选未展示。修正这些校验错误后仅返回完整 JSON："
-                    + "；".join(errors),
+                    + "；".join(errors)
+                    + "。上次候选未应用，仍针对原快照生成完整替换；检查所有受影响的使用点。",
                 },
             ]
     if status == "blocked":
         answer = (
             "本轮回答未通过校验，未展示候选回答或代码。校验反馈（可能含模型判断）："
-            + "；".join(dict.fromkeys(checks))
+            + "；".join(latest_errors)
         )
         if context["semantic_facts"]:
             answer += "\n\n当前可核对的依据：\n" + "\n".join(
                 "- " + fact["statement"] for fact in context["semantic_facts"]
             )
-        answer += "\n\n请缩小到一个函数或一项具体修改后重试；当前没有修改或执行任何代码。"
+        answer += (
+            "\n\n以上是最后一次候选的失败原因，逐次过程见本轮校验记录。"
+            "可指定一个修改目标后重试；当前没有修改或执行任何代码。"
+        )
+    for index, record in enumerate(attempts):
+        if not record.errors:
+            continue
+        if index < len(attempts) - 1:
+            state = "历史候选，已替换；不代表当前候选仍有此问题"
+            if record.local_status == "failed" and attempts[-1].local_status == "passed":
+                state = "历史候选；后续候选已通过本地校验"
+        else:
+            state = "当前未通过"
+        checks.append(f"第 {record.attempt} 次候选（{state}）：" + "；".join(record.errors))
     return FollowupResult(
         answer=answer,
         status=status,
         patch_count=patch_count,
         checks=list(dict.fromkeys(checks)),
+        attempts=attempts,
         metrics=Metrics(
             elapsed_seconds=round(time.perf_counter() - started, 2),
             stages=stages,

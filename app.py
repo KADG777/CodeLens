@@ -374,6 +374,13 @@ if "report" in st.session_state:
                     f"{label} · {usage['elapsed_seconds']:.2f} 秒 · {usage['model_calls']} 次模型调用 · 输入/输出 token {usage['prompt_tokens']}/{usage['completion_tokens']}"
                 )
                 with st.expander("本轮校验记录"):
+                    states = {"passed": "通过", "failed": "未通过", "skipped": "未进行"}
+                    for attempt in meta.get("attempts", []):
+                        st.caption(
+                            f"第 {attempt['attempt']} 次候选 · "
+                            f"本地校验：{states[attempt['local_status']]} · "
+                            f"方案复核：{states[attempt['audit_status']]}"
+                        )
                     for note in meta["checks"]:
                         st.write(note)
     with st.container():

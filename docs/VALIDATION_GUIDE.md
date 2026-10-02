@@ -2,7 +2,7 @@
 
 本指南随 2026-10-02 的仓库补齐工作加入。验证命令均从 CodeLens 仓库根目录运行；输出到被 Git 忽略的 `reports/`，不覆盖已交付的历史记录。
 
-2026-10-02 本轮完整回归：**239 项通过**，Ruff 检查通过。两份内置合成代码完成真实 DeepSeek 工具循环和复核，最终记录与首轮修正过程见 [QUALITY_EVALUATION.md](QUALITY_EVALUATION.md)。这些数字是本轮实测记录，重新运行时应以本机输出为准。
+2026-10-02 追问修正后的完整回归：**245 项通过**，Ruff 检查通过。两轮合成追问实测、此前主审工具循环演示及其版本范围见 [QUALITY_EVALUATION.md](QUALITY_EVALUATION.md)。重新运行时应以本机输出为准。
 
 ## 安装与离线回归
 
@@ -80,3 +80,12 @@ python -m venv .venv
 ```
 
 主审三策略、追问和速度对比的测量目标不同。小样本开发回归不代表通用准确率，也不能将不同代码或不同版本的单次耗时当作公平对照。
+
+## 追问修正的定向复跑
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests/test_followup_repair.py tests/test_app.py
+.\.venv\Scripts\python.exe evaluate_followup.py --cases evals/followup-repair.json --output reports/followup-repair-current.json
+```
+
+第二条命令调用真实 API。检查 `attempts` 的各轮本地/模型校验状态及最终 `answer`，不要把历史候选失败当成当前失败；成功案例还需核对完整使用链与“原代码/未应用建议”的区别。测试修正路径无需 API。

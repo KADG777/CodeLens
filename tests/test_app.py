@@ -38,6 +38,8 @@ def test_web_followup_shows_validation_status_and_history(blocked):
     assert history[1]["review_meta"]["status"] == ("blocked" if blocked else "completed")
     assert any("本轮校验记录" == item.label for item in app.expander)
     assert any("次模型调用" in item.value for item in app.caption)
+    assert history[1]["review_meta"]["attempts"]
+    assert any("第 1 次候选" in item.value for item in app.caption)
 
 
 def test_web_demo_review_and_changed_source_notice():
