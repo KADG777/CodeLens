@@ -1,0 +1,609 @@
+{
+  "recorded_at_utc": "2026-10-02T04:04:25.931275+00:00",
+  "model": "deepseek-flash",
+  "runtime_sha256": "34e229c1115213a92e97ead4d1ec8ad04e6051ab4903c0d0c92ab879e5299ac2",
+  "python": "3.12.9",
+  "scope": "两份合成代码的真实 API 工具循环与复核；未执行被审查代码，不代表通用准确率。",
+  "runs": [
+    {
+      "id": "python_defaults_and_zero",
+      "filename": "synthetic.py",
+      "code": "def remember(value, entries=[]):\n    entries.append(value)\n    return entries\n\ndef broken_ratio():\n    return 10 / 0\n",
+      "expected_rules": [
+        "AST002",
+        "AST005"
+      ],
+      "protocol": [
+        {
+          "call": 1,
+          "offered_tools": [
+            "parse_structure",
+            "run_static_checks",
+            "calculate_slice",
+            "check_broadcast",
+            "keras_split"
+          ],
+          "tool_feedback": [],
+          "max_tokens": 3200,
+          "status": "completed",
+          "response": {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+              {
+                "index": 0,
+                "id": "call_00_icTqHvA3oZ7QdzKD49p82375",
+                "type": "function",
+                "function": {
+                  "name": "parse_structure",
+                  "arguments": "{}"
+                }
+              },
+              {
+                "index": 1,
+                "id": "call_01_eGZz4sq4JzY5PXQX9LJs5773",
+                "type": "function",
+                "function": {
+                  "name": "run_static_checks",
+                  "arguments": "{}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "call": 2,
+          "offered_tools": [
+            "calculate_slice",
+            "check_broadcast",
+            "keras_split"
+          ],
+          "tool_feedback": [
+            {
+              "role": "tool",
+              "tool_call_id": "call_00_icTqHvA3oZ7QdzKD49p82375",
+              "content": "{\"syntax_error\":null,\"symbols\":[{\"kind\":\"FunctionDef\",\"name\":\"remember\",\"line\":1,\"end_line\":3},{\"kind\":\"FunctionDef\",\"name\":\"broken_ratio\",\"line\":5,\"end_line\":6}],\"imports\":[]}"
+            },
+            {
+              "role": "tool",
+              "tool_call_id": "call_01_eGZz4sq4JzY5PXQX9LJs5773",
+              "content": "{\"builtin_status\":\"completed\",\"builtin_findings\":[{\"title\":\"使用字面量零作为除数\",\"severity\":\"high\",\"line_start\":6,\"line_end\":6,\"explanation\":\"如果执行到这个表达式且左侧是普通数值，将触发 ZeroDivisionError。\",\"rule_id\":\"AST005\"},{\"title\":\"可变默认参数会跨调用共享\",\"severity\":\"medium\",\"line_start\":1,\"line_end\":1,\"explanation\":\"默认对象只在函数定义时创建一次；若函数或调用者修改该对象，后续省略该参数的调用会观察到先前状态。\",\"rule_id\":\"AST002\"}],\"builtin_selection\":{\"total_count\":2,\"unique_count\":2,\"retained_count\":2,\"omitted_count\":0,\"duplicate_count\":0,\"truncated\":false},\"ruff\":{\"status\":\"completed\",\"findings\":[],\"total_count\":0,\"unique_count\":0,\"retained_count\":0,\"omitted_count\":0,\"duplicate_count\":0,\"truncated\":false,\"truncation_notice\":\"\"},\"total_count\":2,\"unique_count\":2,\"retained_count\":2,\"omitted_count\":0,\"duplicate_count\":0,\"truncated\":false,\"truncation_notice\":\"\"}"
+            }
+          ],
+          "max_tokens": 3200,
+          "status": "completed",
+          "response": {
+            "role": "assistant",
+            "content": "{\"findings\":[{\"title\":\"可变默认参数 entries=[] 在多次调用间共享状态\",\"severity\":\"medium\",\"category\":\"Bug\",\"line_start\":1,\"line_end\":3,\"explanation\":\"默认列表在函数定义时只创建一次，所有省略 entries 的调用共用同一列表。例如 remember(1) 返回 [1]，随后 remember(2) 返回 [1, 2]，调用者会看到与本次调用无关的历史数据，导致结果被污染。\",\"suggestion\":\"改为 entries=None，函数体内 if entries is None: entries = []，再 append 并返回，使每次调用获得独立列表。\",\"evidence\":\"def remember(value, entries=[]):\\n    entries.append(value)\\n    return entries\",\"rule_id\":\"AST002\",\"evidence_role\":\"source\",\"trigger\":\"连续调用 remember(1) 与 remember(2)，均不传 entries\",\"trigger_basis\":\"local_input\"},{\"title\":\"broken_ratio 中字面量除以零必然抛出 ZeroDivisionError\",\"severity\":\"high\",\"category\":\"异常处理\",\"line_start\":5,\"line_end\":6,\"explanation\":\"函数体无条件执行 10 / 0，任何调用都会立即抛出 ZeroDivisionError，函数无法返回任何值，调用方若未捕获该异常将直接中断。\",\"suggestion\":\"若为占位实现，应改为返回明确值或抛出带说明的异常；若需真实计算，应使用非零除数并对除数为零的情况做显式校验与处理。\",\"evidence\":\"def broken_ratio():\\n    return 10 / 0\",\"rule_id\":\"AST005\",\"evidence_role\":\"source\",\"trigger\":\"调用 broken_ratio()\",\"trigger_basis\":\"local_input\"}],\"limitations\":[\"仅审查当前文件的两个函数，未提供调用方代码，无法判断异常是否被上层捕获或默认参数是否被外部修改。\"]}"
+          }
+        },
+        {
+          "call": 3,
+          "offered_tools": [],
+          "tool_feedback": [],
+          "max_tokens": 1600,
+          "status": "completed",
+          "response": {
+            "role": "assistant",
+            "content": "{\"decisions\":[{\"finding_id\":2,\"verdict\":\"supported\",\"reason\":\"第6行 return 10 / 0 中除数为字面量 0，执行该函数必然抛出 ZeroDivisionError，机制与标题一致。\",\"basis\":\"local_code\",\"impact_kind\":\"runtime_failure\",\"severity\":\"high\"},{\"finding_id\":1,\"verdict\":\"supported\",\"reason\":\"第1行 entries=[] 在定义时创建一次，第2行 append 会修改该共享对象，后续省略参数的调用返回同一列表。\",\"basis\":\"local_code\",\"impact_kind\":\"wrong_result\",\"severity\":\"medium\"}]}"
+          }
+        }
+      ],
+      "report": {
+        "schema_version": 5,
+        "filename": "synthetic.py",
+        "language": "python",
+        "source_hash": "2e03d2809148",
+        "mode": "deepseek",
+        "model": "deepseek-flash",
+        "strategy": "full",
+        "summary": "本次保留 2 条问题与建议（静态规则命中 2 条，模型复核支持 0 条），另有 0 条待确认。源码引用及工具来源已检查；未执行被审查代码，结论仍需结合实际测试。",
+        "findings": [
+          {
+            "title": "使用字面量零作为除数",
+            "severity": "high",
+            "category": "Bug",
+            "line_start": 6,
+            "line_end": 6,
+            "explanation": "如果执行到这个表达式且左侧是普通数值，将触发 ZeroDivisionError。",
+            "suggestion": "修正除数，并根据业务规则处理除数为零的情况。",
+            "evidence": "10 / 0",
+            "rule_id": "AST005",
+            "evidence_role": "related",
+            "related_evidence": [],
+            "trigger": "",
+            "trigger_basis": "unspecified",
+            "verification": "static",
+            "review_note": "本次实际工具的规则、位置及原始诊断已匹配；模型复核未改变工具结论。",
+            "impact": "",
+            "verification_hint": ""
+          },
+          {
+            "title": "可变默认参数会跨调用共享",
+            "severity": "medium",
+            "category": "Bug",
+            "line_start": 1,
+            "line_end": 1,
+            "explanation": "默认对象只在函数定义时创建一次；若函数或调用者修改该对象，后续省略该参数的调用会观察到先前状态。",
+            "suggestion": "默认值改为 None，并在函数内创建新的列表、字典或集合；若确实需要共享状态，请明确记录。",
+            "evidence": "[]",
+            "rule_id": "AST002",
+            "evidence_role": "related",
+            "related_evidence": [],
+            "trigger": "",
+            "trigger_basis": "unspecified",
+            "verification": "static",
+            "review_note": "本次实际工具的规则、位置及原始诊断已匹配；模型复核未改变工具结论。",
+            "impact": "",
+            "verification_hint": ""
+          }
+        ],
+        "pending_findings": [],
+        "verification_records": [
+          {
+            "finding_id": 3,
+            "title": "使用字面量零作为除数",
+            "status": "duplicate",
+            "reason": "同一工具诊断或完全相同的模型候选已去重。"
+          },
+          {
+            "finding_id": 4,
+            "title": "可变默认参数会跨调用共享",
+            "status": "duplicate",
+            "reason": "同一工具诊断或完全相同的模型候选已去重。"
+          },
+          {
+            "finding_id": 2,
+            "title": "使用字面量零作为除数",
+            "status": "accepted",
+            "reason": "本次实际工具的规则、位置及原始诊断已匹配；模型复核未改变工具结论。"
+          },
+          {
+            "finding_id": 1,
+            "title": "可变默认参数会跨调用共享",
+            "status": "accepted",
+            "reason": "本次实际工具的规则、位置及原始诊断已匹配；模型复核未改变工具结论。"
+          }
+        ],
+        "semantic_facts": [],
+        "calculations": [],
+        "limitations": [
+          "源码事实与静态规则有适用条件；未执行代码或测试，模型复核仍可能误报或漏报。",
+          "仅审查当前文件的两个函数，未提供调用方代码，无法判断异常是否被上层捕获或默认参数是否被外部修改。"
+        ],
+        "reflection_status": "completed",
+        "checks": {
+          "Python 语法与结构": "completed",
+          "内置 AST 规则": "completed",
+          "Ruff 静态检查": "completed"
+        },
+        "events": [
+          {
+            "stage": "输入校验",
+            "detail": "synthetic.py · Python · 6 行 · 快照 2e03d2809148"
+          },
+          {
+            "stage": "源码事实核对",
+            "detail": "提取 0 条计算/API 事实；未执行被审查代码。"
+          },
+          {
+            "stage": "工具规划",
+            "detail": "第 1 轮：可继续调用工具，也可直接输出报告 JSON。"
+          },
+          {
+            "stage": "工具执行",
+            "detail": "parse_structure · 结果已返回"
+          },
+          {
+            "stage": "工具执行",
+            "detail": "run_static_checks · 结果已返回"
+          },
+          {
+            "stage": "工具反馈与初审",
+            "detail": "第 2 轮：可继续调用工具，也可直接输出报告 JSON。"
+          },
+          {
+            "stage": "证据校验",
+            "detail": "2 条候选需复核（高/中优先级或证据链/工具背书检查）；普通低优先级意见仍可待确认。"
+          },
+          {
+            "stage": "反思复核",
+            "detail": "按事实逐条返回简短裁决，仅修正必要字段。"
+          },
+          {
+            "stage": "报告完成",
+            "detail": "保留 2 条问题与建议，0 条待确认。"
+          }
+        ],
+        "metrics": {
+          "model_calls": 3,
+          "http_attempts": 3,
+          "tool_calls": 2,
+          "prompt_tokens": 8326,
+          "completion_tokens": 566,
+          "elapsed_seconds": 3.66,
+          "stages": [
+            {
+              "stage": "源码事实核对",
+              "kind": "local",
+              "elapsed_seconds": 0.0,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            },
+            {
+              "stage": "工具规划",
+              "kind": "model",
+              "elapsed_seconds": 0.474,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 2928,
+              "completion_tokens": 37,
+              "status": "completed"
+            },
+            {
+              "stage": "parse_structure",
+              "kind": "tool",
+              "elapsed_seconds": 0.0,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            },
+            {
+              "stage": "run_static_checks",
+              "kind": "tool",
+              "elapsed_seconds": 0.152,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            },
+            {
+              "stage": "工具反馈与初审",
+              "kind": "model",
+              "elapsed_seconds": 2.13,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 3159,
+              "completion_tokens": 395,
+              "status": "completed"
+            },
+            {
+              "stage": "证据校验",
+              "kind": "local",
+              "elapsed_seconds": 0.002,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            },
+            {
+              "stage": "反思复核",
+              "kind": "model",
+              "elapsed_seconds": 0.89,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 2239,
+              "completion_tokens": 134,
+              "status": "completed"
+            },
+            {
+              "stage": "报告整理",
+              "kind": "local",
+              "elapsed_seconds": 0.001,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            }
+          ]
+        },
+        "created_at": "2026-10-02T04:04:30.245914+00:00"
+      },
+      "markdown": "# 代码审查报告：synthetic.py\n\n语言：Python\n\n模式：DeepSeek | 模型：deepseek-flash\n\n策略：full | 快照：2e03d2809148 | 时间：2026-10-02T04:04:30.245914+00:00\n\n复核状态：completed\n\n## 概览\n\n本次保留 2 条问题与建议（静态规则命中 2 条，模型复核支持 0 条），另有 0 条待确认。源码引用及工具来源已检查；未执行被审查代码，结论仍需结合实际测试。\n\n## 问题与建议\n\n### 1. [高 · 静态规则命中] 使用字面量零作为除数\n\n位置：L6–L6 | 类型：Bug\n\n依据状态：静态规则命中 | 规则：AST005\n\n````python\n    return 10 / 0\n````\n\n**问题与触发条件**：如果执行到这个表达式且左侧是普通数值，将触发 ZeroDivisionError。\n\n**引用证据 · 相关代码 · L6–L6**：\n\n````python\n10 / 0\n````\n\n**复核说明**：本次实际工具的规则、位置及原始诊断已匹配；模型复核未改变工具结论。\n\n**修改建议**：修正除数，并根据业务规则处理除数为零的情况。\n\n### 2. [中 · 静态规则命中] 可变默认参数会跨调用共享\n\n位置：L1–L1 | 类型：Bug\n\n依据状态：静态规则命中 | 规则：AST002\n\n````python\ndef remember(value, entries=[]):\n````\n\n**问题与触发条件**：默认对象只在函数定义时创建一次；若函数或调用者修改该对象，后续省略该参数的调用会观察到先前状态。\n\n**引用证据 · 相关代码 · L1–L1**：\n\n````python\n[]\n````\n\n**复核说明**：本次实际工具的规则、位置及原始诊断已匹配；模型复核未改变工具结论。\n\n**修改建议**：默认值改为 None，并在函数内创建新的列表、字典或集合；若确实需要共享状态，请明确记录。\n\n## 校验与复核记录\n\n- 候选 3 · 使用字面量零作为除数 · duplicate：同一工具诊断或完全相同的模型候选已去重。\n\n- 候选 4 · 可变默认参数会跨调用共享 · duplicate：同一工具诊断或完全相同的模型候选已去重。\n\n- 候选 2 · 使用字面量零作为除数 · accepted：本次实际工具的规则、位置及原始诊断已匹配；模型复核未改变工具结论。\n\n- 候选 1 · 可变默认参数会跨调用共享 · accepted：本次实际工具的规则、位置及原始诊断已匹配；模型复核未改变工具结论。\n\n## 覆盖与限制\n\n- 源码事实与静态规则有适用条件；未执行代码或测试，模型复核仍可能误报或漏报。\n- 仅审查当前文件的两个函数，未提供调用方代码，无法判断异常是否被上层捕获或默认参数是否被外部修改。\n\n## 执行记录\n\n- 输入校验：synthetic.py · Python · 6 行 · 快照 2e03d2809148\n- 源码事实核对：提取 0 条计算/API 事实；未执行被审查代码。\n- 工具规划：第 1 轮：可继续调用工具，也可直接输出报告 JSON。\n- 工具执行：parse_structure · 结果已返回\n- 工具执行：run_static_checks · 结果已返回\n- 工具反馈与初审：第 2 轮：可继续调用工具，也可直接输出报告 JSON。\n- 证据校验：2 条候选需复核（高/中优先级或证据链/工具背书检查）；普通低优先级意见仍可待确认。\n- 反思复核：按事实逐条返回简短裁决，仅修正必要字段。\n- 报告完成：保留 2 条问题与建议，0 条待确认。\n\n耗时 3.66 秒；模型调用 3 次；工具调用 2 次；输入/输出 token 8326/566。\n\n## 各阶段开销\n\n| 阶段 | 秒 | 模型调用 | HTTP 尝试 | 输入 token | 输出 token | 状态 |\n|---|---:|---:|---:|---:|---:|---|\n| 源码事实核对 | 0.000 | 0 | 0 | 0 | 0 | completed |\n| 工具规划 | 0.474 | 1 | 1 | 2928 | 37 | completed |\n| parse_structure | 0.000 | 0 | 0 | 0 | 0 | completed |\n| run_static_checks | 0.152 | 0 | 0 | 0 | 0 | completed |\n| 工具反馈与初审 | 2.130 | 1 | 1 | 3159 | 395 | completed |\n| 证据校验 | 0.002 | 0 | 0 | 0 | 0 | completed |\n| 反思复核 | 0.890 | 1 | 1 | 2239 | 134 | completed |\n| 报告整理 | 0.001 | 0 | 0 | 0 | 0 | completed |\n",
+      "checks": {
+        "actual_static_tool_called": true,
+        "reflection_completed": true,
+        "expected_found": true
+      }
+    },
+    {
+      "id": "cpp_delete_mismatch",
+      "filename": "synthetic.cpp",
+      "code": "void release() {\n    int* values = new int[4];\n    delete values;\n}\n",
+      "expected_lines": [
+        3
+      ],
+      "protocol": [
+        {
+          "call": 1,
+          "offered_tools": [
+            "parse_structure",
+            "run_static_checks",
+            "calculate_slice",
+            "check_broadcast",
+            "keras_split"
+          ],
+          "tool_feedback": [],
+          "max_tokens": 3200,
+          "status": "completed",
+          "response": {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+              {
+                "index": 0,
+                "id": "call_00_xfHYR0YLy50OQCbdrxvp5571",
+                "type": "function",
+                "function": {
+                  "name": "parse_structure",
+                  "arguments": "{}"
+                }
+              },
+              {
+                "index": 1,
+                "id": "call_01_dMMlBMP3v9AJ5jojT4K66492",
+                "type": "function",
+                "function": {
+                  "name": "run_static_checks",
+                  "arguments": "{}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "call": 2,
+          "offered_tools": [
+            "calculate_slice",
+            "check_broadcast",
+            "keras_split"
+          ],
+          "tool_feedback": [
+            {
+              "role": "tool",
+              "tool_call_id": "call_00_xfHYR0YLy50OQCbdrxvp5571",
+              "content": "{\"language\":\"cpp\",\"status\":\"completed\",\"detail\":\"\",\"symbols\":[{\"kind\":\"function\",\"name\":\"release\",\"line\":1,\"end_line\":4}],\"imports\":[],\"parse_errors\":[],\"limitations\":[\"C++ 使用 Tree-sitter 解析当前文件；不展开宏、不读取 #include 头文件，不进行编译、链接或运行。\",\"C++ 本地规则不做完整类型推导、控制流、跨文件或生命周期分析；模板、宏及条件编译可能影响解析和判断。\"]}"
+            },
+            {
+              "role": "tool",
+              "tool_call_id": "call_01_dMMlBMP3v9AJ5jojT4K66492",
+              "content": "{\"language\":\"cpp\",\"builtin_status\":\"completed\",\"builtin_findings\":[{\"title\":\"new 与 delete 的数组形式不匹配\",\"severity\":\"high\",\"line_start\":3,\"line_end\":3,\"explanation\":\"相邻语句创建和释放同一指针，但 new[] / delete[] 的数组形式不一致，可能产生未定义行为。\",\"rule_id\":\"CPP006\"}],\"detail\":\"\",\"limitations\":[\"C++ 使用 Tree-sitter 解析当前文件；不展开宏、不读取 #include 头文件，不进行编译、链接或运行。\",\"C++ 本地规则不做完整类型推导、控制流、跨文件或生命周期分析；模板、宏及条件编译可能影响解析和判断。\"],\"total_count\":1,\"unique_count\":1,\"retained_count\":1,\"omitted_count\":0,\"duplicate_count\":0,\"truncated\":false,\"truncation_notice\":\"\"}"
+            }
+          ],
+          "max_tokens": 3200,
+          "status": "completed",
+          "response": {
+            "role": "assistant",
+            "content": "{\"findings\":[{\"title\":\"new[] 分配却用 delete 释放，数组形式不匹配\",\"severity\":\"high\",\"category\":\"Bug\",\"line_start\":2,\"line_end\":3,\"explanation\":\"第 2 行用 new int[4] 分配数组，第 3 行却用标量 delete 释放。C++ 标准要求 new[] 必须与 delete[] 配对，形式不匹配属于未定义行为：可能只调用首个元素的析构、破坏堆元数据，导致堆损坏或崩溃。\",\"suggestion\":\"改为 delete[] values;，或改用 std::vector<int> / std::unique_ptr<int[]> 等 RAII 容器自动管理生命周期。\",\"evidence\":\"    int* values = new int[4];\\n    delete values;\",\"rule_id\":\"CPP006\",\"evidence_role\":\"related\",\"trigger\":\"调用 release() 时，new int[4] 的返回值被 delete 而非 delete[] 释放\",\"trigger_basis\":\"local_input\"},{\"title\":\"裸指针手工管理内存，缺少异常安全与所有权约束\",\"severity\":\"medium\",\"category\":\"可维护性\",\"line_start\":1,\"line_end\":4,\"explanation\":\"values 为裸指针，若后续在 new 与 delete 之间插入可能抛异常的代码，delete 将被跳过而泄漏；函数也未说明所有权归属，调用方无法判断是否需自行释放。当前代码路径简单，暂无实际泄漏，但扩展时风险明显。\",\"suggestion\":\"用 std::vector<int> values(4); 或 std::unique_ptr<int[]> values(new int[4]); 替代裸指针，由 RAII 保证任何路径下都正确释放。\",\"evidence\":\"    int* values = new int[4];\",\"rule_id\":\"\",\"evidence_role\":\"related\",\"trigger\":\"在 new 与 delete 之间加入可能抛出异常的语句（如函数调用、容器操作）时，delete 不会执行\",\"trigger_basis\":\"external_condition\"}],\"limitations\":[\"仅解析当前文件，未展开头文件、未编译或运行，无法验证实际堆行为与调用上下文。\",\"函数无参数、无返回值，未提供调用方信息，无法判断是否存在其他所有权或并发使用问题。\"]}"
+          }
+        },
+        {
+          "call": 3,
+          "offered_tools": [],
+          "tool_feedback": [],
+          "max_tokens": 1600,
+          "status": "completed",
+          "response": {
+            "role": "assistant",
+            "content": "{\"decisions\":[{\"finding_id\":1,\"verdict\":\"supported\",\"reason\":\"第2行 new int[4] 分配数组，第3行 delete values 使用非数组形式，标准规定 new[] 必须与 delete[] 配对，否则未定义行为。\",\"basis\":\"local_code\",\"impact_kind\":\"runtime_failure\",\"severity\":\"high\"},{\"finding_id\":2,\"verdict\":\"rejected\",\"reason\":\"当前代码 new 与 delete 之间无任何可抛异常语句，无实际泄漏或所有权歧义；所述风险依赖未来插入代码，属推测性可维护性偏好。\",\"basis\":\"local_code\",\"impact_kind\":\"style\",\"severity\":\"low\"}]}"
+          }
+        }
+      ],
+      "report": {
+        "schema_version": 5,
+        "filename": "synthetic.cpp",
+        "language": "cpp",
+        "source_hash": "f0e63f105793",
+        "mode": "deepseek",
+        "model": "deepseek-flash",
+        "strategy": "full",
+        "summary": "本次保留 1 条问题与建议（静态规则命中 1 条，模型复核支持 0 条），另有 0 条待确认。源码引用及工具来源已检查；未执行被审查代码，结论仍需结合实际测试。",
+        "findings": [
+          {
+            "title": "new 与 delete 的数组形式不匹配",
+            "severity": "high",
+            "category": "Bug",
+            "line_start": 3,
+            "line_end": 3,
+            "explanation": "相邻语句创建和释放同一指针，但 new[] / delete[] 的数组形式不一致，可能产生未定义行为。",
+            "suggestion": "new[] 配对 delete[]，单对象 new 配对 delete；优先使用 std::vector 或适当类型的智能指针。",
+            "evidence": "delete values",
+            "rule_id": "CPP006",
+            "evidence_role": "related",
+            "related_evidence": [],
+            "trigger": "",
+            "trigger_basis": "unspecified",
+            "verification": "static",
+            "review_note": "本次实际工具的规则、位置及原始诊断已匹配；模型复核未改变工具结论。",
+            "impact": "",
+            "verification_hint": ""
+          }
+        ],
+        "pending_findings": [],
+        "verification_records": [
+          {
+            "finding_id": 2,
+            "title": "裸指针手工管理内存，缺少异常安全与所有权约束",
+            "status": "relocated",
+            "reason": "按原样证据将 L1–L4 校正为 L2–L2。"
+          },
+          {
+            "finding_id": 3,
+            "title": "new 与 delete 的数组形式不匹配",
+            "status": "duplicate",
+            "reason": "同一工具诊断或完全相同的模型候选已去重。"
+          },
+          {
+            "finding_id": 1,
+            "title": "new 与 delete 的数组形式不匹配",
+            "status": "accepted",
+            "reason": "本次实际工具的规则、位置及原始诊断已匹配；模型复核未改变工具结论。"
+          },
+          {
+            "finding_id": 2,
+            "title": "裸指针手工管理内存，缺少异常安全与所有权约束",
+            "status": "rejected",
+            "reason": "当前代码 new 与 delete 之间无任何可抛异常语句，无实际泄漏或所有权歧义；所述风险依赖未来插入代码，属推测性可维护性偏好。"
+          }
+        ],
+        "semantic_facts": [],
+        "calculations": [],
+        "limitations": [
+          "C++ 使用 Tree-sitter 解析当前文件；不展开宏、不读取 #include 头文件，不进行编译、链接或运行。",
+          "C++ 本地规则不做完整类型推导、控制流、跨文件或生命周期分析；模板、宏及条件编译可能影响解析和判断。",
+          "源码事实与静态规则有适用条件；未执行代码或测试，模型复核仍可能误报或漏报。",
+          "仅解析当前文件，未展开头文件、未编译或运行，无法验证实际堆行为与调用上下文。",
+          "函数无参数、无返回值，未提供调用方信息，无法判断是否存在其他所有权或并发使用问题。"
+        ],
+        "reflection_status": "completed",
+        "checks": {
+          "C++ 语法树与结构": "completed",
+          "C++ 本地规则": "completed"
+        },
+        "events": [
+          {
+            "stage": "输入校验",
+            "detail": "synthetic.cpp · C++ · 4 行 · 快照 f0e63f105793"
+          },
+          {
+            "stage": "源码事实核对",
+            "detail": "提取 0 条计算/API 事实；未执行被审查代码。"
+          },
+          {
+            "stage": "工具规划",
+            "detail": "第 1 轮：可继续调用工具，也可直接输出报告 JSON。"
+          },
+          {
+            "stage": "工具执行",
+            "detail": "parse_structure · 结果已返回"
+          },
+          {
+            "stage": "工具执行",
+            "detail": "run_static_checks · 结果已返回"
+          },
+          {
+            "stage": "工具反馈与初审",
+            "detail": "第 2 轮：可继续调用工具，也可直接输出报告 JSON。"
+          },
+          {
+            "stage": "证据校验",
+            "detail": "2 条候选需复核（高/中优先级或证据链/工具背书检查）；普通低优先级意见仍可待确认。"
+          },
+          {
+            "stage": "反思复核",
+            "detail": "按事实逐条返回简短裁决，仅修正必要字段。"
+          },
+          {
+            "stage": "报告完成",
+            "detail": "保留 1 条问题与建议，0 条待确认。"
+          }
+        ],
+        "metrics": {
+          "model_calls": 3,
+          "http_attempts": 3,
+          "tool_calls": 2,
+          "prompt_tokens": 8378,
+          "completion_tokens": 654,
+          "elapsed_seconds": 4.51,
+          "stages": [
+            {
+              "stage": "源码事实核对",
+              "kind": "local",
+              "elapsed_seconds": 0.0,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            },
+            {
+              "stage": "工具规划",
+              "kind": "model",
+              "elapsed_seconds": 1.141,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 2911,
+              "completion_tokens": 37,
+              "status": "completed"
+            },
+            {
+              "stage": "parse_structure",
+              "kind": "tool",
+              "elapsed_seconds": 0.014,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            },
+            {
+              "stage": "run_static_checks",
+              "kind": "tool",
+              "elapsed_seconds": 0.0,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            },
+            {
+              "stage": "工具反馈与初审",
+              "kind": "model",
+              "elapsed_seconds": 2.476,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 3134,
+              "completion_tokens": 470,
+              "status": "completed"
+            },
+            {
+              "stage": "证据校验",
+              "kind": "local",
+              "elapsed_seconds": 0.003,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            },
+            {
+              "stage": "反思复核",
+              "kind": "model",
+              "elapsed_seconds": 0.867,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 2333,
+              "completion_tokens": 147,
+              "status": "completed"
+            },
+            {
+              "stage": "报告整理",
+              "kind": "local",
+              "elapsed_seconds": 0.0,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            }
+          ]
+        },
+        "created_at": "2026-10-02T04:04:34.757344+00:00"
+      },
+      "markdown": "# 代码审查报告：synthetic.cpp\n\n语言：C++\n\n模式：DeepSeek | 模型：deepseek-flash\n\n策略：full | 快照：f0e63f105793 | 时间：2026-10-02T04:04:34.757344+00:00\n\n复核状态：completed\n\n## 概览\n\n本次保留 1 条问题与建议（静态规则命中 1 条，模型复核支持 0 条），另有 0 条待确认。源码引用及工具来源已检查；未执行被审查代码，结论仍需结合实际测试。\n\n## 问题与建议\n\n### 1. [高 · 静态规则命中] new 与 delete 的数组形式不匹配\n\n位置：L3–L3 | 类型：Bug\n\n依据状态：静态规则命中 | 规则：CPP006\n\n````cpp\n    delete values;\n````\n\n**问题与触发条件**：相邻语句创建和释放同一指针，但 new[] / delete[] 的数组形式不一致，可能产生未定义行为。\n\n**引用证据 · 相关代码 · L3–L3**：\n\n````cpp\ndelete values\n````\n\n**复核说明**：本次实际工具的规则、位置及原始诊断已匹配；模型复核未改变工具结论。\n\n**修改建议**：new[] 配对 delete[]，单对象 new 配对 delete；优先使用 std::vector 或适当类型的智能指针。\n\n## 校验与复核记录\n\n- 候选 2 · 裸指针手工管理内存，缺少异常安全与所有权约束 · relocated：按原样证据将 L1–L4 校正为 L2–L2。\n\n- 候选 3 · new 与 delete 的数组形式不匹配 · duplicate：同一工具诊断或完全相同的模型候选已去重。\n\n- 候选 1 · new 与 delete 的数组形式不匹配 · accepted：本次实际工具的规则、位置及原始诊断已匹配；模型复核未改变工具结论。\n\n- 候选 2 · 裸指针手工管理内存，缺少异常安全与所有权约束 · rejected：当前代码 new 与 delete 之间无任何可抛异常语句，无实际泄漏或所有权歧义；所述风险依赖未来插入代码，属推测性可维护性偏好。\n\n## 覆盖与限制\n\n- C++ 使用 Tree-sitter 解析当前文件；不展开宏、不读取 #include 头文件，不进行编译、链接或运行。\n- C++ 本地规则不做完整类型推导、控制流、跨文件或生命周期分析；模板、宏及条件编译可能影响解析和判断。\n- 源码事实与静态规则有适用条件；未执行代码或测试，模型复核仍可能误报或漏报。\n- 仅解析当前文件，未展开头文件、未编译或运行，无法验证实际堆行为与调用上下文。\n- 函数无参数、无返回值，未提供调用方信息，无法判断是否存在其他所有权或并发使用问题。\n\n## 执行记录\n\n- 输入校验：synthetic.cpp · C++ · 4 行 · 快照 f0e63f105793\n- 源码事实核对：提取 0 条计算/API 事实；未执行被审查代码。\n- 工具规划：第 1 轮：可继续调用工具，也可直接输出报告 JSON。\n- 工具执行：parse_structure · 结果已返回\n- 工具执行：run_static_checks · 结果已返回\n- 工具反馈与初审：第 2 轮：可继续调用工具，也可直接输出报告 JSON。\n- 证据校验：2 条候选需复核（高/中优先级或证据链/工具背书检查）；普通低优先级意见仍可待确认。\n- 反思复核：按事实逐条返回简短裁决，仅修正必要字段。\n- 报告完成：保留 1 条问题与建议，0 条待确认。\n\n耗时 4.51 秒；模型调用 3 次；工具调用 2 次；输入/输出 token 8378/654。\n\n## 各阶段开销\n\n| 阶段 | 秒 | 模型调用 | HTTP 尝试 | 输入 token | 输出 token | 状态 |\n|---|---:|---:|---:|---:|---:|---|\n| 源码事实核对 | 0.000 | 0 | 0 | 0 | 0 | completed |\n| 工具规划 | 1.141 | 1 | 1 | 2911 | 37 | completed |\n| parse_structure | 0.014 | 0 | 0 | 0 | 0 | completed |\n| run_static_checks | 0.000 | 0 | 0 | 0 | 0 | completed |\n| 工具反馈与初审 | 2.476 | 1 | 1 | 3134 | 470 | completed |\n| 证据校验 | 0.003 | 0 | 0 | 0 | 0 | completed |\n| 反思复核 | 0.867 | 1 | 1 | 2333 | 147 | completed |\n| 报告整理 | 0.000 | 0 | 0 | 0 | 0 | completed |\n",
+      "checks": {
+        "actual_static_tool_called": true,
+        "reflection_completed": true,
+        "expected_found": true
+      }
+    }
+  ]
+}

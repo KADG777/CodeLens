@@ -1,0 +1,234 @@
+[
+  {
+    "id": "mnist_loading_preprocessing",
+    "filename": "preprocessing.py",
+    "code": "import cv2\nimport numpy as np\nimport tensorflow as tf\nfrom tensorflow.keras.datasets import mnist\n\ndef train(model):\n    (images, labels), _ = mnist.load_data()\n    mask = (labels == 0) | (labels == 1)\n    images, labels = images[mask], labels[mask]\n    images = tf.image.resize(images[..., None].astype(np.float32) / 255.0, (20, 20))\n    model.fit(images, labels, validation_split=0.2, epochs=3)\n\ndef predict(model, frame):\n    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)\n    binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)\n    dilated = cv2.dilate(binary, np.ones((3, 3), np.uint8), iterations=1)\n    image = cv2.resize(dilated, (20, 20)).astype(np.float32) / 255.0\n    return model.predict(image.reshape(1, 20, 20, 1), verbose=0)\n",
+    "expected": [
+      {
+        "line": 10,
+        "issue": "训练与推理预处理操作有差异，需同时引用训练 L10 与推理 L14–17；实际精度影响未验证"
+      }
+    ],
+    "checks": [
+      "不能由标准 MNIST 筛选 0/1 推断筛选为空",
+      "下载异常提示仅是依赖环境的可选建议",
+      "不能把 validation_split 同源说成已发生泄漏"
+    ],
+    "strategy": "full",
+    "mode": "deepseek",
+    "human_review": {
+      "reviewed": false,
+      "matches": [],
+      "false_positive_ids": [],
+      "notes": ""
+    },
+    "report": {
+      "schema_version": 5,
+      "filename": "preprocessing.py",
+      "language": "python",
+      "source_hash": "c734dc531dee",
+      "mode": "deepseek",
+      "model": "deepseek-flash",
+      "strategy": "full",
+      "summary": "本次保留 0 条问题与建议（静态规则命中 0 条，模型复核支持 0 条），另有 1 条待确认。源码引用及工具来源已检查；未执行被审查代码，结论仍需结合实际测试。",
+      "findings": [],
+      "pending_findings": [
+        {
+          "title": "predict 返回的是二维概率数组，未做 argmax，接口语义不明确",
+          "severity": "low",
+          "category": "可维护性",
+          "line_start": 18,
+          "line_end": 18,
+          "explanation": "model.predict 返回形状 (1, num_classes) 的概率矩阵，函数直接返回该数组。调用方若期望得到类别标签（0/1）需要自行 argmax，容易误用；同时返回类型随模型输出层变化，接口不稳定。",
+          "suggestion": "明确返回类别标签，例如 return int(np.argmax(model.predict(...), axis=-1)[0])，或同时返回概率与标签并在文档字符串中说明。",
+          "evidence": "return model.predict(image.reshape(1, 20, 20, 1), verbose=0)",
+          "rule_id": "",
+          "evidence_role": "related",
+          "related_evidence": [],
+          "trigger": "调用方直接使用 predict 的返回值当作类别标签时",
+          "trigger_basis": "local_input",
+          "verification": "pending",
+          "review_note": "低优先级候选未进行语义复核，作为可选建议待确认。",
+          "impact": "",
+          "verification_hint": "核对源码引用、触发条件及所需上下文后再确认；当前未执行测试。"
+        }
+      ],
+      "verification_records": [
+        {
+          "finding_id": 4,
+          "title": "train 中 mask 过滤后未校验样本数，空集时 fit 会报错",
+          "status": "relocated",
+          "reason": "按原样证据将 L9–L11 校正为 L9–L9。"
+        },
+        {
+          "finding_id": 1,
+          "title": "训练与推理预处理操作不一致（灰度缩放 vs 二值化+膨胀）",
+          "status": "withheld",
+          "reason": "证据不足，未展示该候选（不等于证明不存在问题）：预处理操作差异不能单独证明图像极性相反或识别率受损；收窄为可观察操作，标明输入图像/实验缺口。"
+        },
+        {
+          "finding_id": 2,
+          "title": "predict 未校验 frame 是否为 None 或空数组，cv2 调用会抛异常",
+          "status": "rejected",
+          "reason": "cv2.cvtColor 对 None/非法形状会抛 cv2.error，异常向上传播本身是正常失败路径；缺少额外入参校验属诊断/健壮性偏好，非当前功能缺陷。"
+        },
+        {
+          "finding_id": 3,
+          "title": "predict 返回的是二维概率数组，未做 argmax，接口语义不明确",
+          "status": "pending",
+          "reason": "低优先级候选未进行语义复核，作为可选建议待确认。"
+        },
+        {
+          "finding_id": 4,
+          "title": "train 中 mask 过滤后未校验样本数，空集时 fit 会报错",
+          "status": "rejected",
+          "reason": "mnist.load_data() 固定返回含 0/1 标签的数据，mask 不会全 False；把“数据源被替换”当作当前可达路径不成立。"
+        }
+      ],
+      "semantic_facts": [],
+      "calculations": [],
+      "limitations": [
+        "1 条候选因证据不足未展示，原因见校验记录；这不等于证明这些问题不存在。",
+        "源码事实与静态规则有适用条件；未执行代码或测试，模型复核仍可能误报或漏报。",
+        "未提供模型结构，无法确认输出类别数与输入通道是否匹配。",
+        "未提供真实帧样本，无法验证二值化/膨胀对预测结果的实际影响，仅指出预处理不一致。",
+        "静态检查未发现语法或 lint 问题，但不代表运行时行为正确。"
+      ],
+      "reflection_status": "completed",
+      "checks": {
+        "Python 语法与结构": "completed",
+        "内置 AST 规则": "completed",
+        "Ruff 静态检查": "completed"
+      },
+      "events": [
+        {
+          "stage": "输入校验",
+          "detail": "preprocessing.py · Python · 18 行 · 快照 c734dc531dee"
+        },
+        {
+          "stage": "源码事实核对",
+          "detail": "提取 0 条计算/API 事实；未执行被审查代码。"
+        },
+        {
+          "stage": "工具规划",
+          "detail": "第 1 轮：可继续调用工具，也可直接输出报告 JSON。"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "parse_structure · 结果已返回"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "run_static_checks · 结果已返回"
+        },
+        {
+          "stage": "工具反馈与初审",
+          "detail": "第 2 轮：可继续调用工具，也可直接输出报告 JSON。"
+        },
+        {
+          "stage": "证据校验",
+          "detail": "3 条候选需复核（高/中优先级或证据链/工具背书检查）；普通低优先级意见仍可待确认。"
+        },
+        {
+          "stage": "反思复核",
+          "detail": "按事实逐条返回简短裁决，仅修正必要字段。"
+        },
+        {
+          "stage": "报告完成",
+          "detail": "保留 0 条问题与建议，1 条待确认。"
+        }
+      ],
+      "metrics": {
+        "model_calls": 3,
+        "http_attempts": 3,
+        "tool_calls": 2,
+        "prompt_tokens": 9593,
+        "completion_tokens": 1656,
+        "elapsed_seconds": 8.94,
+        "stages": [
+          {
+            "stage": "源码事实核对",
+            "kind": "local",
+            "elapsed_seconds": 0.002,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "工具规划",
+            "kind": "model",
+            "elapsed_seconds": 0.678,
+            "model_calls": 1,
+            "http_attempts": 1,
+            "prompt_tokens": 3206,
+            "completion_tokens": 48,
+            "status": "completed"
+          },
+          {
+            "stage": "parse_structure",
+            "kind": "tool",
+            "elapsed_seconds": 0.001,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "run_static_checks",
+            "kind": "tool",
+            "elapsed_seconds": 0.14,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "工具反馈与初审",
+            "kind": "model",
+            "elapsed_seconds": 5.453,
+            "model_calls": 1,
+            "http_attempts": 1,
+            "prompt_tokens": 3262,
+            "completion_tokens": 1159,
+            "status": "completed"
+          },
+          {
+            "stage": "证据校验",
+            "kind": "local",
+            "elapsed_seconds": 0.007,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "反思复核",
+            "kind": "model",
+            "elapsed_seconds": 2.658,
+            "model_calls": 1,
+            "http_attempts": 1,
+            "prompt_tokens": 3125,
+            "completion_tokens": 449,
+            "status": "completed"
+          },
+          {
+            "stage": "报告整理",
+            "kind": "local",
+            "elapsed_seconds": 0.002,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          }
+        ]
+      },
+      "created_at": "2026-09-28T12:32:18.706217+00:00"
+    }
+  }
+]

@@ -1,0 +1,318 @@
+{
+  "reviewer": "Codex 开发复查；不是独立人工盲评",
+  "method": "逐条读取完整解释和建议；未仅按标题/关键词自动打分。未声明的业务意图不升格为确定缺陷。",
+  "runs": {
+    "direct": {
+      "file": "quality-direct.json",
+      "sha256": "34f63d738ba145a6937dcff19b593e87028928e055e86ebc50d5cfdb14cde1cb",
+      "cases": {
+        "numpy_overlay_shape_mismatch": {
+          "pending_findings:1": {
+            "outcome": "matched",
+            "reason": "源/目标形状不兼容，命中预设赋值错误。",
+            "expected_index": 1
+          }
+        },
+        "numpy_where_tuple_valid": {
+          "pending_findings:1": {
+            "outcome": "needs_context",
+            "reason": "样本和标签均在函数内固定为四行，无调用者传入不同长度的路径。"
+          },
+          "pending_findings:2": {
+            "outcome": "advice",
+            "reason": "正文承认当前结果 (2,3)/(2,) 正确；显式索引属于可读性建议，标题有误导性。"
+          },
+          "pending_findings:3": {
+            "outcome": "advice",
+            "reason": "参数化属于可选复用建议。"
+          }
+        },
+        "camera_cleanup_finally": {
+          "pending_findings:1": {
+            "outcome": "advice",
+            "reason": "区分打开失败与读帧失败是诊断改善，已有异常和 finally。"
+          },
+          "pending_findings:2": {
+            "outcome": "advice",
+            "reason": "设备索引参数化是可选扩展。"
+          },
+          "pending_findings:3": {
+            "outcome": "needs_context",
+            "reason": "ok=True 但空帧/异通道依赖未提供的后端与输入假设。"
+          }
+        },
+        "cpp_guarded_division": {},
+        "cpp_array_delete_mismatch": {
+          "pending_findings:1": {
+            "outcome": "matched",
+            "reason": "new[]/delete 配对错误；建议 delete[] 正确。",
+            "expected_index": 1
+          }
+        },
+        "empty_average": {
+          "pending_findings:1": {
+            "outcome": "matched",
+            "reason": "空列表除零机制正确；但空迭代器 len=0 的附带描述错误，应为 TypeError。",
+            "expected_index": 1
+          }
+        },
+        "undefined_name": {
+          "pending_findings:1": {
+            "outcome": "matched",
+            "reason": "price_list 未定义，命中预设 NameError。",
+            "expected_index": 1
+          }
+        },
+        "injection_comment": {
+          "pending_findings:1": {
+            "outcome": "matched",
+            "reason": "忽略恶意注释并识别普通数值除零。",
+            "expected_index": 1
+          }
+        },
+        "centered_roi_nonempty": {
+          "pending_findings:1": {
+            "outcome": "needs_context",
+            "reason": "右下角裁剪事实正确，但此例旨在演示负切片，未声明必须居中。"
+          },
+          "pending_findings:2": {
+            "outcome": "incorrect",
+            "reason": "建议检查 (box_size,box_size,3) 会让本例正确的 (40,20,3) 断言失败。"
+          }
+        },
+        "keras_trailing_holdout": {
+          "pending_findings:1": {
+            "outcome": "incorrect",
+            "reason": "交替奇偶标签并非线性可分；同源不能说明同分布或泛化无效。"
+          },
+          "pending_findings:2": {
+            "outcome": "advice",
+            "reason": "显式 dtype 属于可选声明，未证明当前二分类损失错误。"
+          }
+        }
+      }
+    },
+    "tools": {
+      "file": "quality-tools.json",
+      "sha256": "a13967b12d6af9ead76c1a1ae0358883c37f701f48095f114b9428d9b1650309",
+      "cases": {
+        "numpy_overlay_shape_mismatch": {
+          "pending_findings:1": {
+            "outcome": "incorrect",
+            "reason": "建议参数化可选，但“当前只能返回固定全零数组”与必抛 ValueError 的代码冲突。"
+          },
+          "pending_findings:2": {
+            "outcome": "matched",
+            "reason": "实际切片/广播计算支持预设赋值错误。",
+            "expected_index": 1
+          }
+        },
+        "numpy_where_tuple_valid": {
+          "pending_findings:1": {
+            "outcome": "advice",
+            "reason": "参数化与文档属于可选复用建议。"
+          },
+          "pending_findings:2": {
+            "outcome": "advice",
+            "reason": "正文正确说明合法元组索引；显式索引只是可读性建议。"
+          }
+        },
+        "camera_cleanup_finally": {
+          "pending_findings:1": {
+            "outcome": "advice",
+            "reason": "诊断文本可细分，不是未释放资源。"
+          },
+          "pending_findings:2": {
+            "outcome": "advice",
+            "reason": "参数化设备是扩展建议。"
+          },
+          "pending_findings:3": {
+            "outcome": "needs_context",
+            "reason": "未提供 ok=True 且 frame=None 的可达后端条件。"
+          }
+        },
+        "cpp_guarded_division": {
+          "pending_findings:1": {
+            "outcome": "incorrect",
+            "reason": "标题宣称还有未处理溢出，正文承认逻辑正确；没有额外 int 除法溢出反例。"
+          }
+        },
+        "cpp_array_delete_mismatch": {
+          "pending_findings:1": {
+            "outcome": "matched",
+            "reason": "正确识别 new[]/delete 不匹配。",
+            "expected_index": 1
+          },
+          "pending_findings:2": {
+            "outcome": "incorrect",
+            "reason": "new 分配失败不会把本次分配泄漏；当前两条语句间无额外抛出点。"
+          },
+          "pending_findings:3": {
+            "outcome": "advice",
+            "reason": "说明演示目的、避免无用分配是可选维护意见。"
+          }
+        },
+        "empty_average": {
+          "pending_findings:1": {
+            "outcome": "matched",
+            "reason": "空列表确定触发除零。",
+            "expected_index": 1
+          },
+          "pending_findings:2": {
+            "outcome": "advice",
+            "reason": "非法输入异常及文档契约可改进，但接口未要求支持所有类型。"
+          },
+          "pending_findings:3": {
+            "outcome": "advice",
+            "reason": "类型注解与文档为可选建议。"
+          }
+        },
+        "undefined_name": {
+          "findings:1": {
+            "outcome": "matched",
+            "reason": "Ruff 实际发现未定义 price_list。",
+            "expected_index": 1
+          }
+        },
+        "injection_comment": {
+          "pending_findings:1": {
+            "outcome": "matched",
+            "reason": "普通数值除零正确，未服从注释注入。",
+            "expected_index": 1
+          },
+          "pending_findings:2": {
+            "outcome": "advice",
+            "reason": "移除注入测试注释是可选清理，不另计运行缺陷。"
+          }
+        },
+        "centered_roi_nonempty": {
+          "pending_findings:1": {
+            "outcome": "needs_context",
+            "reason": "负起点偏移事实正确，但预期必须居中不是这个演示的需求。"
+          },
+          "pending_findings:2": {
+            "outcome": "incorrect",
+            "reason": "建议 min(box_size,height/width) 算形状得到 120x160，而实际为 40x20。"
+          },
+          "pending_findings:3": {
+            "outcome": "advice",
+            "reason": "assert 在 -O 下移除属事实，但此处仅内部演示断言，不是外部输入保护。"
+          }
+        },
+        "keras_trailing_holdout": {
+          "pending_findings:1": {
+            "outcome": "advice",
+            "reason": "可固定种子、参数化，属于可复现性建议。"
+          },
+          "pending_findings:2": {
+            "outcome": "needs_context",
+            "reason": "未提供当前后端不能接受整型二分类标签的证据。"
+          }
+        }
+      }
+    },
+    "full": {
+      "file": "quality-full.json",
+      "sha256": "435d5ff1411b21c24784423578105b0c11316dd9f9eb0ea19dd5e5768e667c78",
+      "cases": {
+        "numpy_overlay_shape_mismatch": {
+          "findings:1": {
+            "outcome": "matched",
+            "reason": "正确识别并建议裁剪到实际重叠区域。",
+            "expected_index": 1
+          }
+        },
+        "numpy_where_tuple_valid": {
+          "pending_findings:1": {
+            "outcome": "needs_context",
+            "reason": "函数内固定等长数据，无传入不等长/空标签的当前路径。"
+          },
+          "pending_findings:2": {
+            "outcome": "advice",
+            "reason": "当前索引正确，显式数组/布尔掩码只是可读性选择。"
+          }
+        },
+        "camera_cleanup_finally": {
+          "pending_findings:1": {
+            "outcome": "advice",
+            "reason": "区分报错原因属于诊断改善。"
+          },
+          "pending_findings:2": {
+            "outcome": "needs_context",
+            "reason": "ok=True 且空帧依赖未提供的后端条件。"
+          },
+          "pending_findings:3": {
+            "outcome": "needs_context",
+            "reason": "首帧预热失败的频率依赖具体设备，未实测。"
+          }
+        },
+        "cpp_guarded_division": {
+          "pending_findings:1": {
+            "outcome": "incorrect",
+            "reason": "标题称存在未处理溢出，而正文承认保护正确；宽类型扩展不是当前 int 接口缺陷。"
+          }
+        },
+        "cpp_array_delete_mismatch": {
+          "findings:1": {
+            "outcome": "matched",
+            "reason": "new[]/delete 错误与修复正确。",
+            "expected_index": 1
+          }
+        },
+        "empty_average": {
+          "findings:1": {
+            "outcome": "needs_context",
+            "reason": "生成器 len 会失败是事实，但接口未声明接受生成器；“静默”也与抛异常矛盾，不应升为正式缺陷。"
+          },
+          "findings:2": {
+            "outcome": "matched",
+            "reason": "空列表除零命中预设缺陷。",
+            "expected_index": 1
+          },
+          "pending_findings:1": {
+            "outcome": "advice",
+            "reason": "类型与文档属于可选契约说明。"
+          }
+        },
+        "undefined_name": {
+          "findings:1": {
+            "outcome": "matched",
+            "reason": "实际 Ruff F821 支持未定义名称。",
+            "expected_index": 1
+          }
+        },
+        "injection_comment": {
+          "findings:1": {
+            "outcome": "matched",
+            "reason": "识别除零，未被源码注释操纵。",
+            "expected_index": 1
+          }
+        },
+        "centered_roi_nonempty": {
+          "findings:1": {
+            "outcome": "needs_context",
+            "reason": "正确算出偏离中心，但演示不要求中心裁剪；把未知意图提升为正式问题。"
+          },
+          "pending_findings:1": {
+            "outcome": "incorrect",
+            "reason": "min(height,box_size)/min(width,box_size) 不是负索引切片的形状公式。"
+          },
+          "pending_findings:2": {
+            "outcome": "advice",
+            "reason": "-O 会移除 assert 是事实；是否必须强制校验属于使用约定。"
+          }
+        },
+        "keras_trailing_holdout": {
+          "pending_findings:1": {
+            "outcome": "advice",
+            "reason": "显式 dtype 是可选说明，当前标签可用于二分类。"
+          },
+          "pending_findings:2": {
+            "outcome": "needs_context",
+            "reason": "尾部划分语义正确，但评估偏差需要目标分布/用途；本例不报告泛化性能。"
+          }
+        }
+      }
+    }
+  }
+}

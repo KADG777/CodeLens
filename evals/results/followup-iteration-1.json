@@ -1,0 +1,393 @@
+[
+  {
+    "id": "roi_stale_claim",
+    "filename": "roi.py",
+    "code": "import numpy as np\n\ndef example():\n    frame = np.zeros((120, 160, 3), dtype=np.uint8)\n    height, width = frame.shape[:2]\n    box_size = 200\n    x1, y1 = (width - box_size) // 2, (height - box_size) // 2\n    x2, y2 = x1 + box_size, y1 + box_size\n    roi = frame[y1:y2, x1:x2]\n    assert roi.shape == (40, 20, 3)\n    return roi\n",
+    "questions": [
+      "旧报告说这个 ROI 在 160×120 下为空并崩溃，你核对后解释一下，不要改代码。"
+    ],
+    "expected": [
+      "纠正旧报告为空的误报；给出 (40,20,3)；不再以必崩为修改理由"
+    ],
+    "legacy_pending": {
+      "title": "低分辨率下 ROI 为空",
+      "severity": "medium",
+      "category": "Bug",
+      "line_start": 9,
+      "line_end": 9,
+      "explanation": "160×120 会得到空数组并崩溃。",
+      "suggestion": "防止空 ROI。",
+      "evidence": "roi = frame[y1:y2, x1:x2]"
+    },
+    "history": [
+      {
+        "role": "assistant",
+        "content": "之前的推测：这个 ROI 肯定是空的。"
+      }
+    ],
+    "model": "deepseek-flash",
+    "source_hash": "f005fee8d75b",
+    "turns": [
+      {
+        "question": "旧报告说这个 ROI 在 160×120 下为空并崩溃，你核对后解释一下，不要改代码。",
+        "answer": "结论：旧报告的说法不成立，已作为 rejected_claims 否决。按 fact_1，frame 形状为 (120,160,3)、box_size=200 时，x1=(160-200)//2=-20，y1=(120-200)//2=-40，x2=180，y2=160；NumPy 基本切片把负起点按 0 处理，实际得到 frame[0:160, 0:180]，即 shape (120,160,3)，非空，因此第 10 行断言 (40,20,3) 会失败，但失败原因是断言期望值与实际切片不符，而不是“ROI 为空”。真正会得到 (40,20,3) 的算例是 box_size 小于等于边长（如 40×20 的框），此时中心公式给出非空 ROI。注意 fact_1 的适用条件是正尺寸数组与正 box_size，且不覆盖零尺寸、非数组对象或其他预处理错误；这些情形下行为未知，需另行验证。本次不改代码。\n\n依据：源码事实 fact_1 · L5–L9（有适用条件）；已否决的原待确认 1。\n\n**建议验证（未执行）**\n\n1. 在 Python 中构造 np.zeros((120,160,3), dtype=np.uint8)，按源码公式计算 x1,y1,x2,y2 并打印 roi.shape，确认实际为 (120,160,3) 而非空。\n2. 把 box_size 改为 40 与 20，分别打印 roi.shape，确认中心公式在框小于边长时得到非空 ROI。\n3. 若要复现旧报告结论，需补充其实际输入（frame 形状、box_size、dtype 或非数组对象），否则无法支持“空 ROI”判断。\n\n未执行代码或测试，以上为按 NumPy 基本切片语义的静态推导。\n\nfact_1 不覆盖零尺寸、非数组对象或其他预处理错误，这些情形的影响未知。\n\n以上依据当前代码快照；未执行代码或验证模型效果。",
+        "status": "completed",
+        "metrics": {
+          "model_calls": 1,
+          "http_attempts": 1,
+          "tool_calls": 0,
+          "prompt_tokens": 1349,
+          "completion_tokens": 422,
+          "elapsed_seconds": 2.54,
+          "stages": [
+            {
+              "stage": "追问生成",
+              "kind": "model",
+              "elapsed_seconds": 2.535,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 1349,
+              "completion_tokens": 422,
+              "status": "completed"
+            },
+            {
+              "stage": "追问本地校验",
+              "kind": "local",
+              "elapsed_seconds": 0.005,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            }
+          ]
+        },
+        "checks": [
+          "引用、已知事实冲突与补丁检查完成；不构成一般语义正确性证明。"
+        ],
+        "patch_count": 0
+      }
+    ],
+    "developer_review": {
+      "reviewed": false,
+      "passed": null,
+      "notes": ""
+    }
+  },
+  {
+    "id": "keras_contract",
+    "filename": "holdout.py",
+    "code": "import numpy as np\nfrom keras import Sequential\nfrom keras.layers import Dense, Input\n\ndef train():\n    x = np.arange(1400, dtype=np.float32).reshape(700, 2)\n    y = np.arange(700) % 2\n    model = Sequential([Input(shape=(2,)), Dense(1, activation=\"sigmoid\")])\n    model.compile(optimizer=\"adam\", loss=\"binary_crossentropy\")\n    model.fit(x, y, epochs=1, validation_split=0.2, shuffle=True)\n    return model\n",
+    "questions": [
+      "这里 validation_split 是随机切分吗？同源数据能证明数据泄漏吗？只解释，不要代码。"
+    ],
+    "expected": [
+      "末尾留出，打乱前划分；留出样本不参与该次训练；不能仅凭同源认定泄漏"
+    ],
+    "model": "deepseek-flash",
+    "source_hash": "db482f08ab33",
+    "turns": [
+      {
+        "question": "这里 validation_split 是随机切分吗？同源数据能证明数据泄漏吗？只解释，不要代码。",
+        "answer": "本轮回答未通过校验，未展示其中的推断或代码。原因：fact_1：Keras validation_split 先取末尾验证样本，验证部分不参与该次训练；同源不足以证明泄漏或指标虚高。\n\n当前可核对的依据：\n- Keras Model.fit 对 NumPy/张量输入使用 validation_split 时，先取末尾样本作验证，再打乱训练部分；验证部分不用于本次 fit 的训练。validation_data 非空时覆盖 validation_split。同源不等于样本重叠或泄漏，也不能单凭同源断言指标虚高；独立测试集是另一个评估问题。\n\n请缩小到一个函数或一项具体修改后重试；当前没有修改或执行任何代码。",
+        "status": "blocked",
+        "metrics": {
+          "model_calls": 2,
+          "http_attempts": 2,
+          "tool_calls": 0,
+          "prompt_tokens": 3066,
+          "completion_tokens": 904,
+          "elapsed_seconds": 4.99,
+          "stages": [
+            {
+              "stage": "追问生成",
+              "kind": "model",
+              "elapsed_seconds": 3.053,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 1281,
+              "completion_tokens": 452,
+              "status": "completed"
+            },
+            {
+              "stage": "追问本地校验",
+              "kind": "local",
+              "elapsed_seconds": 0.001,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "failed"
+            },
+            {
+              "stage": "追问修正",
+              "kind": "model",
+              "elapsed_seconds": 1.932,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 1785,
+              "completion_tokens": 452,
+              "status": "completed"
+            },
+            {
+              "stage": "追问本地校验",
+              "kind": "local",
+              "elapsed_seconds": 0.0,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "failed"
+            }
+          ]
+        },
+        "checks": [
+          "fact_1：Keras validation_split 先取末尾验证样本，验证部分不参与该次训练；同源不足以证明泄漏或指标虚高。"
+        ],
+        "patch_count": 0
+      }
+    ],
+    "developer_review": {
+      "reviewed": false,
+      "passed": null,
+      "notes": ""
+    }
+  },
+  {
+    "id": "python_patch_and_memory",
+    "filename": "empty_average.py",
+    "code": "def average(values):\n    return sum(values) / len(values)\n",
+    "questions": [
+      "请修复空列表导致除零的问题，保持 average 函数名，不要改成默默返回 0。",
+      "沿用你刚才选择的空列表处理方式，只解释并给出两个具体测试输入及预期结果，不要重复代码。"
+    ],
+    "expected": [
+      "直接给出空列表显式报错的可定位补丁；无新未定义名称；第二轮记住第一轮方案；验证包含正常及空输入"
+    ],
+    "model": "deepseek-flash",
+    "source_hash": "487b1ab0923a",
+    "turns": [
+      {
+        "question": "请修复空列表导致除零的问题，保持 average 函数名，不要改成默默返回 0。",
+        "answer": "空列表时 `len(values)==0`，`sum(values)/len(values)` 会抛 `ZeroDivisionError`。修复方向是显式拒绝空输入：抛出带说明的 `ValueError`，而不是返回 0 掩盖问题。下面补丁保留函数名与原有非空行为，仅增加空输入分支。\n\n**替换原文件 L1–L2**：空序列提前抛出明确异常，避免 ZeroDivisionError，同时不改变非空输入的计算结果与返回类型。\n\n````python\ndef average(values):\n    if not values:\n        raise ValueError(\"average() requires at least one value\")\n    return sum(values) / len(values)\n````\n\n**建议验证（未执行）**\n\n1. 调用 `average([])`，确认抛出 `ValueError` 且消息可读，而非 `ZeroDivisionError`。\n2. 调用 `average([1, 2, 3])`，确认返回 2.0，与修改前一致。\n3. 调用 `average([0])`，确认返回 0.0，验证未把合法零值误判为空。\n4. 若调用方依赖旧异常类型，检查是否有 `except ZeroDivisionError` 需要同步调整。\n\n未执行代码或测试，以上为静态分析结论。\n\n若业务上允许空输入，需另行约定返回语义（如 None），本补丁按“不静默返回 0”的要求抛异常。\n\n补丁已通过源码位置与本地语法检查，仅为文本建议；未修改原文件、未运行测试，也未验证识别率。",
+        "status": "completed",
+        "metrics": {
+          "model_calls": 1,
+          "http_attempts": 1,
+          "tool_calls": 0,
+          "prompt_tokens": 961,
+          "completion_tokens": 332,
+          "elapsed_seconds": 2.37,
+          "stages": [
+            {
+              "stage": "追问生成",
+              "kind": "model",
+              "elapsed_seconds": 2.069,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 961,
+              "completion_tokens": 332,
+              "status": "completed"
+            },
+            {
+              "stage": "追问本地校验",
+              "kind": "local",
+              "elapsed_seconds": 0.294,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            }
+          ]
+        },
+        "checks": [
+          "引用、已知事实冲突与补丁检查完成；不构成一般语义正确性证明。"
+        ],
+        "patch_count": 1
+      },
+      {
+        "question": "沿用你刚才选择的空列表处理方式，只解释并给出两个具体测试输入及预期结果，不要重复代码。",
+        "answer": "沿用上一轮方案：空输入显式抛 `ValueError`，非空输入保持 `sum(values)/len(values)` 不变，不静默返回 0。因此 `average([])` 不再抛 `ZeroDivisionError`，而是抛出带说明的 `ValueError`；`average([1, 2, 3])` 仍返回 2.0。注意 `[0]` 是非空序列，返回 0.0，不会被误判为空。本轮按要求不重复代码，仅给测试输入与预期。\n\n**建议验证（未执行）**\n\n1. 输入 `average([])`：预期抛出 `ValueError`，消息含 \"at least one value\"，且不是 `ZeroDivisionError`。\n2. 输入 `average([1, 2, 3])`：预期返回 2.0，与修改前一致，用于确认非空行为未变。\n3. 对照方法：同一解释器下分别运行上述两例，比较异常类型与返回值；若调用方存在 `except ZeroDivisionError`，需确认其是否仍能捕获新异常。\n\n未执行代码或测试，以上为静态分析预期，实际异常类型与消息需运行确认。\n\n若业务允许空输入，需另行约定返回语义，本方案按“不静默返回 0”抛异常。\n\n以上依据当前代码快照；未执行代码或验证模型效果。",
+        "status": "completed",
+        "metrics": {
+          "model_calls": 1,
+          "http_attempts": 1,
+          "tool_calls": 0,
+          "prompt_tokens": 1366,
+          "completion_tokens": 290,
+          "elapsed_seconds": 1.6,
+          "stages": [
+            {
+              "stage": "追问生成",
+              "kind": "model",
+              "elapsed_seconds": 1.596,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 1366,
+              "completion_tokens": 290,
+              "status": "completed"
+            },
+            {
+              "stage": "追问本地校验",
+              "kind": "local",
+              "elapsed_seconds": 0.0,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            }
+          ]
+        },
+        "checks": [
+          "引用、已知事实冲突与补丁检查完成；不构成一般语义正确性证明。"
+        ],
+        "patch_count": 0
+      }
+    ],
+    "developer_review": {
+      "reviewed": false,
+      "passed": null,
+      "notes": ""
+    }
+  },
+  {
+    "id": "cpp_patch",
+    "filename": "release.cpp",
+    "code": "void release() {\n    int* data = new int[4];\n    delete data;\n}\n",
+    "questions": [
+      "请直接修复这段 C++ 的内存释放问题，保留函数接口，给出修改代码。"
+    ],
+    "expected": [
+      "delete[] 与 new[] 配对；源码位置正确；明确未编译运行"
+    ],
+    "model": "deepseek-flash",
+    "source_hash": "df430410dddc",
+    "turns": [
+      {
+        "question": "请直接修复这段 C++ 的内存释放问题，保留函数接口，给出修改代码。",
+        "answer": "结论：`new int[4]` 必须用 `delete[]` 释放，当前 `delete data` 是数组/非数组形式不匹配，属未定义行为（finding:1）。最小修复是把第 3 行改为 `delete[] data;`，函数签名 `void release()` 不变。若允许改内部实现，更稳妥的是用 `std::vector<int>` 或 `std::unique_ptr<int[]>` 管理，避免手动配对出错；但为保持最小改动，这里只给 delete[] 补丁。\n\n依据：问题 1（规则命中/模型支持，未运行验证）。\n\n**替换原文件 L3–L3**：new[] 分配的内存必须用 delete[] 释放，否则行为未定义（finding:1）。\n\n````cpp\n    delete[] data;\n````\n\n**建议验证（未执行）**\n\n1. 静态检查：确认第 2 行为 `new int[4]`、第 3 行为 `delete[] data;`，两者数组形式一致。\n2. 编译验证：用 `g++ -std=c++17 -Wall -Wextra -fsyntax-only release.cpp` 检查语法与告警（不运行）。\n3. 动态验证（可选）：在 ASan 下编译运行 `g++ -std=c++17 -fsanitize=address -g release.cpp`，调用 release() 后确认无 new/delete 不匹配报告。\n4. 对照方法：把第 3 行临时改回 `delete data;` 再跑同一 ASan 用例，比较是否出现不匹配报错，以确认修复有效。\n\n未编译或运行，仅基于静态规则与源码事实。\n\n若该指针实际指向单对象或来自其他分配路径，需按真实所有权重新判断。\n\n补丁已通过源码位置与本地语法检查，仅为文本建议；未修改原文件、未运行测试，也未验证识别率。",
+        "status": "completed",
+        "metrics": {
+          "model_calls": 1,
+          "http_attempts": 1,
+          "tool_calls": 0,
+          "prompt_tokens": 1200,
+          "completion_tokens": 390,
+          "elapsed_seconds": 2.22,
+          "stages": [
+            {
+              "stage": "追问生成",
+              "kind": "model",
+              "elapsed_seconds": 2.22,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 1200,
+              "completion_tokens": 390,
+              "status": "completed"
+            },
+            {
+              "stage": "追问本地校验",
+              "kind": "local",
+              "elapsed_seconds": 0.0,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            }
+          ]
+        },
+        "checks": [
+          "引用、已知事实冲突与补丁检查完成；不构成一般语义正确性证明。"
+        ],
+        "patch_count": 1
+      }
+    ],
+    "developer_review": {
+      "reviewed": false,
+      "passed": null,
+      "notes": ""
+    }
+  },
+  {
+    "id": "recognition_preprocessing",
+    "filename": "recognizer.py",
+    "code": "import cv2\nimport numpy as np\n\n\ndef training_pixels(images):\n    return np.stack([cv2.resize(x, (20, 20)) for x in images]).astype(np.float32) / 255.0\n\n\ndef camera_pixels(gray_roi):\n    binary = cv2.adaptiveThreshold(gray_roi, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\n                                   cv2.THRESH_BINARY_INV, 11, 2)\n    thick = cv2.dilate(binary, np.ones((3, 3), np.uint8), iterations=1)\n    return cv2.resize(thick, (20, 20)).astype(np.float32) / 255.0\n",
+    "questions": [
+      "帮我优化代码提高识别率，优先统一训练和推理预处理。训练图像是黑底白字，摄像头输入是灰度白底黑字。直接给局部改写和验证步骤。"
+    ],
+    "expected": [
+      "提供实际局部代码；两端空间缩放、归一化和极性一致；不承诺提高识别率；保留同一独立测试集比较；明确没有训练或实测"
+    ],
+    "model": "deepseek-flash",
+    "source_hash": "66a31ab3decf",
+    "turns": [
+      {
+        "question": "帮我优化代码提高识别率，优先统一训练和推理预处理。训练图像是黑底白字，摄像头输入是灰度白底黑字。直接给局部改写和验证步骤。",
+        "answer": "本轮回答未通过校验，未展示其中的推断或代码。原因：没有实测数据，不得保证识别率提高。\n\n请缩小到一个函数或一项具体修改后重试；当前没有修改或执行任何代码。",
+        "status": "blocked",
+        "metrics": {
+          "model_calls": 2,
+          "http_attempts": 2,
+          "tool_calls": 0,
+          "prompt_tokens": 3186,
+          "completion_tokens": 1665,
+          "elapsed_seconds": 6.8,
+          "stages": [
+            {
+              "stage": "追问生成",
+              "kind": "model",
+              "elapsed_seconds": 3.791,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 1162,
+              "completion_tokens": 833,
+              "status": "completed"
+            },
+            {
+              "stage": "追问本地校验",
+              "kind": "local",
+              "elapsed_seconds": 0.0,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "failed"
+            },
+            {
+              "stage": "追问修正",
+              "kind": "model",
+              "elapsed_seconds": 3.004,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 2024,
+              "completion_tokens": 832,
+              "status": "completed"
+            },
+            {
+              "stage": "追问本地校验",
+              "kind": "local",
+              "elapsed_seconds": 0.0,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "failed"
+            }
+          ]
+        },
+        "checks": [
+          "没有实测数据，不得保证识别率提高。"
+        ],
+        "patch_count": 0
+      }
+    ],
+    "developer_review": {
+      "reviewed": false,
+      "passed": null,
+      "notes": ""
+    }
+  }
+]

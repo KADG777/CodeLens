@@ -1,0 +1,764 @@
+[
+  {
+    "id": "mnist_loading_preprocessing",
+    "filename": "preprocessing.py",
+    "code": "import cv2\nimport numpy as np\nimport tensorflow as tf\nfrom tensorflow.keras.datasets import mnist\n\ndef train(model):\n    (images, labels), _ = mnist.load_data()\n    mask = (labels == 0) | (labels == 1)\n    images, labels = images[mask], labels[mask]\n    images = tf.image.resize(images[..., None].astype(np.float32) / 255.0, (20, 20))\n    model.fit(images, labels, validation_split=0.2, epochs=3)\n\ndef predict(model, frame):\n    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)\n    binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)\n    dilated = cv2.dilate(binary, np.ones((3, 3), np.uint8), iterations=1)\n    image = cv2.resize(dilated, (20, 20)).astype(np.float32) / 255.0\n    return model.predict(image.reshape(1, 20, 20, 1), verbose=0)\n",
+    "expected": [
+      {
+        "line": 10,
+        "issue": "训练与推理预处理操作有差异，需同时引用训练 L10 与推理 L14–17；实际精度影响未验证"
+      }
+    ],
+    "checks": [
+      "不能由标准 MNIST 筛选 0/1 推断筛选为空",
+      "下载异常提示仅是依赖环境的可选建议",
+      "不能把 validation_split 同源说成已发生泄漏"
+    ],
+    "strategy": "full",
+    "mode": "deepseek",
+    "human_review": {
+      "reviewed": false,
+      "matches": [],
+      "false_positive_ids": [],
+      "notes": ""
+    },
+    "report": {
+      "schema_version": 5,
+      "filename": "preprocessing.py",
+      "language": "python",
+      "source_hash": "c734dc531dee",
+      "mode": "deepseek",
+      "model": "deepseek-flash",
+      "strategy": "full",
+      "summary": "本次保留 1 条问题与建议（静态规则命中 0 条，模型复核支持 1 条），另有 1 条待确认。源码引用及工具来源已检查；未执行被审查代码，结论仍需结合实际测试。",
+      "findings": [
+        {
+          "title": "predict 未校验 frame 是否为 None 或空数组，cv2 调用会抛异常",
+          "severity": "low",
+          "category": "异常处理",
+          "line_start": 14,
+          "line_end": 14,
+          "explanation": "若调用方传入 None（例如摄像头读取失败返回 None）或形状非法的数组，cv2.cvtColor 会抛出 cv2.error 或 TypeError，异常直接向上传播，调用方无法区分“无输入”与“模型错误”。",
+          "suggestion": "在函数开头校验 frame 是否为 None、是否为 ndarray 且 ndim==3，不满足时返回明确错误或抛出带说明的 ValueError。",
+          "evidence": "gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)",
+          "rule_id": "",
+          "evidence_role": "related",
+          "related_evidence": [],
+          "trigger": "predict(model, None) 或传入空/单通道数组。",
+          "trigger_basis": "local_input",
+          "verification": "reviewed",
+          "review_note": "frame 为 None 或非三通道时 cv2.cvtColor 会抛 cv2.error/TypeError，函数无任何校验，异常直接传播。",
+          "impact": "",
+          "verification_hint": ""
+        }
+      ],
+      "pending_findings": [
+        {
+          "title": "predict 返回的是二维概率数组，未做 argmax，接口语义不明确",
+          "severity": "low",
+          "category": "可维护性",
+          "line_start": 18,
+          "line_end": 18,
+          "explanation": "model.predict 返回形状 (1, 2) 的概率分布，函数名 predict 却未给出类别标签，调用方需自行 argmax 并理解列顺序（0/1 对应标签 0/1）。若调用方误把概率当标签使用，会得到恒为 0 或 1 的错误结果。",
+          "suggestion": "在函数内返回 int(np.argmax(probs, axis=1)[0])，或明确文档说明返回概率数组及其列含义。",
+          "evidence": "return model.predict(image.reshape(1, 20, 20, 1), verbose=0)",
+          "rule_id": "",
+          "evidence_role": "related",
+          "related_evidence": [],
+          "trigger": "调用方直接使用返回值作为类别标签时，得到的是浮点概率而非 0/1 标签。",
+          "trigger_basis": "local_input",
+          "verification": "pending",
+          "review_note": "低优先级候选未进行语义复核，作为可选建议待确认。",
+          "impact": "",
+          "verification_hint": "核对源码引用、触发条件及所需上下文后再确认；当前未执行测试。"
+        }
+      ],
+      "verification_records": [
+        {
+          "finding_id": 1,
+          "title": "推理与训练预处理操作不一致（极性影响待验证）",
+          "status": "withheld",
+          "reason": "证据不足，未展示该候选（不等于证明不存在问题）：预处理操作差异不能单独证明图像极性相反或识别率受损；收窄为可观察操作，标明输入图像/实验缺口。"
+        },
+        {
+          "finding_id": 2,
+          "title": "predict 未校验 frame 是否为 None 或空数组，cv2 调用会抛异常",
+          "status": "accepted",
+          "reason": "frame 为 None 或非三通道时 cv2.cvtColor 会抛 cv2.error/TypeError，函数无任何校验，异常直接传播。"
+        },
+        {
+          "finding_id": 3,
+          "title": "predict 返回的是二维概率数组，未做 argmax，接口语义不明确",
+          "status": "pending",
+          "reason": "低优先级候选未进行语义复核，作为可选建议待确认。"
+        },
+        {
+          "finding_id": 4,
+          "title": "train 中 mask 过滤后未检查样本是否为空",
+          "status": "rejected",
+          "reason": "当前数据源 mnist.load_data() 必然含标签 0/1，mask 不会为空；替换数据源属外部假设，非当前代码可达缺陷。"
+        }
+      ],
+      "semantic_facts": [],
+      "calculations": [],
+      "limitations": [
+        "1 条候选因证据不足未展示，原因见校验记录；这不等于证明这些问题不存在。",
+        "源码事实与静态规则有适用条件；未执行代码或测试，模型复核仍可能误报或漏报。",
+        "未提供调用方代码，无法确认 predict 的 frame 来源、返回值使用方式以及是否已有外部校验。",
+        "未运行代码或训练，训练/推理预处理极性差异对精度的影响需用真实样本实验确认。",
+        "静态检查（ruff）未报告问题，不代表代码无缺陷。"
+      ],
+      "reflection_status": "completed",
+      "checks": {
+        "Python 语法与结构": "completed",
+        "内置 AST 规则": "completed",
+        "Ruff 静态检查": "completed"
+      },
+      "events": [
+        {
+          "stage": "输入校验",
+          "detail": "preprocessing.py · Python · 18 行 · 快照 c734dc531dee"
+        },
+        {
+          "stage": "源码事实核对",
+          "detail": "提取 0 条计算/API 事实；未执行被审查代码。"
+        },
+        {
+          "stage": "工具规划",
+          "detail": "第 1 轮：可继续调用工具，也可直接输出报告 JSON。"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "parse_structure · 结果已返回"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "run_static_checks · 结果已返回"
+        },
+        {
+          "stage": "工具反馈与初审",
+          "detail": "第 2 轮：可继续调用工具，也可直接输出报告 JSON。"
+        },
+        {
+          "stage": "证据校验",
+          "detail": "3 条候选需复核（高/中优先级或证据链/工具背书检查）；普通低优先级意见仍可待确认。"
+        },
+        {
+          "stage": "反思复核",
+          "detail": "按事实逐条返回简短裁决，仅修正必要字段。"
+        },
+        {
+          "stage": "报告完成",
+          "detail": "保留 1 条问题与建议，1 条待确认。"
+        }
+      ],
+      "metrics": {
+        "model_calls": 3,
+        "http_attempts": 3,
+        "tool_calls": 2,
+        "prompt_tokens": 9561,
+        "completion_tokens": 1649,
+        "elapsed_seconds": 8.59,
+        "stages": [
+          {
+            "stage": "源码事实核对",
+            "kind": "local",
+            "elapsed_seconds": 0.001,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "工具规划",
+            "kind": "model",
+            "elapsed_seconds": 0.713,
+            "model_calls": 1,
+            "http_attempts": 1,
+            "prompt_tokens": 3206,
+            "completion_tokens": 48,
+            "status": "completed"
+          },
+          {
+            "stage": "parse_structure",
+            "kind": "tool",
+            "elapsed_seconds": 0.001,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "run_static_checks",
+            "kind": "tool",
+            "elapsed_seconds": 0.163,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "工具反馈与初审",
+            "kind": "model",
+            "elapsed_seconds": 5.609,
+            "model_calls": 1,
+            "http_attempts": 1,
+            "prompt_tokens": 3262,
+            "completion_tokens": 1180,
+            "status": "completed"
+          },
+          {
+            "stage": "证据校验",
+            "kind": "local",
+            "elapsed_seconds": 0.008,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "反思复核",
+            "kind": "model",
+            "elapsed_seconds": 2.092,
+            "model_calls": 1,
+            "http_attempts": 1,
+            "prompt_tokens": 3093,
+            "completion_tokens": 421,
+            "status": "completed"
+          },
+          {
+            "stage": "报告整理",
+            "kind": "local",
+            "elapsed_seconds": 0.001,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          }
+        ]
+      },
+      "created_at": "2026-09-28T12:30:45.528616+00:00"
+    }
+  },
+  {
+    "id": "conf_rule_location",
+    "filename": "confidence.py",
+    "code": "def classify(probability):\n    if probability < 0.1:\n        conf = 1 - probability\n        label = '0'\n    elif probability > 0.9:\n        conf = probability\n        label = '1'\n    else:\n        conf = max(probability, 1 - probability)\n        label = 'uncertain'\n    return label\n",
+    "expected": [
+      {
+        "line": 9,
+        "issue": "实际 Ruff F841 诊断对应 L9 的 conf 赋值；不能声称 L3/L6 获得同一诊断验证"
+      }
+    ],
+    "checks": [
+      "工具规则、引用行号与原始诊断一致",
+      "未使用 conf 不能被夸大为已发生的识别率错误"
+    ],
+    "strategy": "full",
+    "mode": "deepseek",
+    "human_review": {
+      "reviewed": false,
+      "matches": [],
+      "false_positive_ids": [],
+      "notes": ""
+    },
+    "report": {
+      "schema_version": 5,
+      "filename": "confidence.py",
+      "language": "python",
+      "source_hash": "af664798597f",
+      "mode": "deepseek",
+      "model": "deepseek-flash",
+      "strategy": "full",
+      "summary": "本次保留 1 条问题与建议（静态规则命中 0 条，模型复核支持 1 条），另有 3 条待确认。源码引用及工具来源已检查；未执行被审查代码，结论仍需结合实际测试。",
+      "findings": [
+        {
+          "title": "conf 计算后未返回，调用方无法获得置信度",
+          "severity": "low",
+          "category": "Bug",
+          "line_start": 9,
+          "line_end": 11,
+          "explanation": "函数在三个分支都计算了 conf，但 return 只返回 label，conf 被丢弃。任何依赖置信度的调用方（如阈值过滤、日志、排序）都拿不到该值，只能拿到字符串标签，属于接口与实现意图不一致。",
+          "suggestion": "若需要置信度，改为 return label, conf（或返回字典/命名元组）；若不需要，删除 conf 赋值以免误导调用方。",
+          "evidence": "conf = max(probability, 1 - probability)\n        label = 'uncertain'\n    return label",
+          "rule_id": "",
+          "evidence_role": "related",
+          "related_evidence": [],
+          "trigger": "调用 classify(0.5) 等任意输入，返回值仅为 'uncertain'，conf 不可获取",
+          "trigger_basis": "local_input",
+          "verification": "reviewed",
+          "review_note": "三个分支均计算 conf，但第 11 行只 return label，conf 被丢弃，调用方无法获取置信度，接口与实现意图不一致。",
+          "impact": "",
+          "verification_hint": ""
+        }
+      ],
+      "pending_findings": [
+        {
+          "title": "probability 为 NaN 时落入 uncertain 分支且 conf 为 NaN",
+          "severity": "low",
+          "category": "异常处理",
+          "line_start": 2,
+          "line_end": 2,
+          "explanation": "NaN 与 0.1、0.9 的比较均为 False，因此 NaN 会走 else 分支，被标记为 'uncertain'，而 conf = max(nan, 1-nan) 结果仍为 NaN。若上游模型输出 NaN（如除零、log(0)），会被静默当作“不确定”而非报错，掩盖数据问题。",
+          "suggestion": "在函数开头校验输入：if not math.isfinite(probability): raise ValueError(...)，或明确文档说明 NaN 的处理约定。",
+          "evidence": "if probability < 0.1:",
+          "rule_id": "",
+          "evidence_role": "related",
+          "related_evidence": [],
+          "trigger": "classify(float('nan')) 返回 'uncertain'，conf 为 NaN",
+          "trigger_basis": "local_input",
+          "verification": "pending",
+          "review_note": "低优先级候选未进行语义复核，作为可选建议待确认。",
+          "impact": "",
+          "verification_hint": "核对源码引用、触发条件及所需上下文后再确认；当前未执行测试。"
+        },
+        {
+          "title": "conf 在低概率分支的取值方向与其它分支不一致",
+          "severity": "low",
+          "category": "可维护性",
+          "line_start": 3,
+          "line_end": 3,
+          "explanation": "probability<0.1 时 conf = 1 - probability（接近 1），而 >0.9 时 conf = probability（也接近 1），else 用 max 取较大者，三者语义一致；但低概率分支写成 1-probability 而非 max，风格不统一，后续修改容易引入偏差。",
+          "suggestion": "统一为 conf = max(probability, 1 - probability)，或直接删除该变量（当前未被使用）。",
+          "evidence": "conf = 1 - probability",
+          "rule_id": "",
+          "evidence_role": "related",
+          "related_evidence": [],
+          "trigger": "阅读/修改该函数时需额外推断各分支 conf 语义",
+          "trigger_basis": "unspecified",
+          "verification": "pending",
+          "review_note": "低优先级候选未进行语义复核，作为可选建议待确认。",
+          "impact": "",
+          "verification_hint": "核对源码引用、触发条件及所需上下文后再确认；当前未执行测试。"
+        },
+        {
+          "title": "边界值 0.1 与 0.9 被归入 uncertain，与阈值语义可能不符",
+          "severity": "low",
+          "category": "Bug",
+          "line_start": 5,
+          "line_end": 5,
+          "explanation": "判断使用严格不等号，probability 恰为 0.1 或 0.9 时既不满足 <0.1 也不满足 >0.9，落入 else 得到 'uncertain'。若业务上 0.1/0.9 应算作确定类别（闭区间），则边界样本会被错误标记。",
+          "suggestion": "确认阈值语义：若为闭区间，改为 probability <= 0.1 与 probability >= 0.9；否则在文档中明确边界归属。",
+          "evidence": "elif probability > 0.9:",
+          "rule_id": "",
+          "evidence_role": "related",
+          "related_evidence": [],
+          "trigger": "classify(0.1) 或 classify(0.9) 返回 'uncertain'",
+          "trigger_basis": "local_input",
+          "verification": "pending",
+          "review_note": "低优先级候选未进行语义复核，作为可选建议待确认。",
+          "impact": "",
+          "verification_hint": "核对源码引用、触发条件及所需上下文后再确认；当前未执行测试。"
+        }
+      ],
+      "verification_records": [
+        {
+          "finding_id": 1,
+          "title": "conf 计算后未返回，调用方无法获得置信度",
+          "status": "relocated",
+          "reason": "按原样证据将 L9–L10 校正为 L9–L11。"
+        },
+        {
+          "finding_id": 2,
+          "title": "probability 为 NaN 时落入 uncertain 分支且 conf 为 NaN",
+          "status": "relocated",
+          "reason": "按原样证据将 L2–L9 校正为 L2–L2。"
+        },
+        {
+          "finding_id": 3,
+          "title": "边界值 0.1 与 0.9 被归入 uncertain，与阈值语义可能不符",
+          "status": "relocated",
+          "reason": "按原样证据将 L2–L8 校正为 L5–L5。"
+        },
+        {
+          "finding_id": 4,
+          "title": "conf 在低概率分支的取值方向与其它分支不一致",
+          "status": "relocated",
+          "reason": "按原样证据将 L3–L9 校正为 L3–L3。"
+        },
+        {
+          "finding_id": 1,
+          "title": "conf 计算后未返回，调用方无法获得置信度",
+          "status": "accepted",
+          "reason": "三个分支均计算 conf，但第 11 行只 return label，conf 被丢弃，调用方无法获取置信度，接口与实现意图不一致。"
+        },
+        {
+          "finding_id": 2,
+          "title": "probability 为 NaN 时落入 uncertain 分支且 conf 为 NaN",
+          "status": "pending",
+          "reason": "低优先级候选未进行语义复核，作为可选建议待确认。"
+        },
+        {
+          "finding_id": 3,
+          "title": "边界值 0.1 与 0.9 被归入 uncertain，与阈值语义可能不符",
+          "status": "pending",
+          "reason": "低优先级候选未进行语义复核，作为可选建议待确认。"
+        },
+        {
+          "finding_id": 4,
+          "title": "conf 在低概率分支的取值方向与其它分支不一致",
+          "status": "pending",
+          "reason": "低优先级候选未进行语义复核，作为可选建议待确认。"
+        }
+      ],
+      "semantic_facts": [],
+      "calculations": [],
+      "limitations": [
+        "源码事实与静态规则有适用条件；未执行代码或测试，模型复核仍可能误报或漏报。",
+        "未提供调用方代码，无法确认 conf 是否本应被返回或使用。",
+        "未提供 probability 的来源与取值范围约定，NaN/越界输入的实际可达性未知。"
+      ],
+      "reflection_status": "completed",
+      "checks": {
+        "Python 语法与结构": "completed",
+        "内置 AST 规则": "completed",
+        "Ruff 静态检查": "completed"
+      },
+      "events": [
+        {
+          "stage": "输入校验",
+          "detail": "confidence.py · Python · 11 行 · 快照 af664798597f"
+        },
+        {
+          "stage": "源码事实核对",
+          "detail": "提取 0 条计算/API 事实；未执行被审查代码。"
+        },
+        {
+          "stage": "工具规划",
+          "detail": "第 1 轮：可继续调用工具，也可直接输出报告 JSON。"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "parse_structure · 结果已返回"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "run_static_checks · 结果已返回"
+        },
+        {
+          "stage": "工具反馈与初审",
+          "detail": "第 2 轮：可继续调用工具，也可直接输出报告 JSON。"
+        },
+        {
+          "stage": "证据校验",
+          "detail": "1 条候选需复核（高/中优先级或证据链/工具背书检查）；普通低优先级意见仍可待确认。"
+        },
+        {
+          "stage": "反思复核",
+          "detail": "按事实逐条返回简短裁决，仅修正必要字段。"
+        },
+        {
+          "stage": "报告完成",
+          "detail": "保留 1 条问题与建议，3 条待确认。"
+        }
+      ],
+      "metrics": {
+        "model_calls": 3,
+        "http_attempts": 3,
+        "tool_calls": 2,
+        "prompt_tokens": 8267,
+        "completion_tokens": 990,
+        "elapsed_seconds": 5.88,
+        "stages": [
+          {
+            "stage": "源码事实核对",
+            "kind": "local",
+            "elapsed_seconds": 0.0,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "工具规划",
+            "kind": "model",
+            "elapsed_seconds": 0.621,
+            "model_calls": 1,
+            "http_attempts": 1,
+            "prompt_tokens": 2983,
+            "completion_tokens": 37,
+            "status": "completed"
+          },
+          {
+            "stage": "parse_structure",
+            "kind": "tool",
+            "elapsed_seconds": 0.0,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "run_static_checks",
+            "kind": "tool",
+            "elapsed_seconds": 0.151,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "工具反馈与初审",
+            "kind": "model",
+            "elapsed_seconds": 4.27,
+            "model_calls": 1,
+            "http_attempts": 1,
+            "prompt_tokens": 3025,
+            "completion_tokens": 847,
+            "status": "completed"
+          },
+          {
+            "stage": "证据校验",
+            "kind": "local",
+            "elapsed_seconds": 0.002,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "反思复核",
+            "kind": "model",
+            "elapsed_seconds": 0.827,
+            "model_calls": 1,
+            "http_attempts": 1,
+            "prompt_tokens": 2259,
+            "completion_tokens": 106,
+            "status": "completed"
+          },
+          {
+            "stage": "报告整理",
+            "kind": "local",
+            "elapsed_seconds": 0.001,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          }
+        ]
+      },
+      "created_at": "2026-09-28T12:30:51.408036+00:00"
+    }
+  },
+  {
+    "id": "reachable_filtered_empty",
+    "filename": "positive.py",
+    "code": "def first_positive(values):\n    selected = [value for value in values if value > 0]\n    return selected[0]\n",
+    "expected": [
+      {
+        "line": 3,
+        "issue": "first_positive([-1]) 筛选结果为空，selected[0] 越界；需要引用过滤条件 L2 与使用点 L3"
+      }
+    ],
+    "checks": [
+      "不能为避免误报而删除具备明确可达输入的真实缺陷",
+      "不执行模型提供的任意代码"
+    ],
+    "strategy": "full",
+    "mode": "deepseek",
+    "human_review": {
+      "reviewed": false,
+      "matches": [],
+      "false_positive_ids": [],
+      "notes": ""
+    },
+    "report": {
+      "schema_version": 5,
+      "filename": "positive.py",
+      "language": "python",
+      "source_hash": "5bbf87e31b7c",
+      "mode": "deepseek",
+      "model": "deepseek-flash",
+      "strategy": "full",
+      "summary": "本次保留 1 条问题与建议（静态规则命中 0 条，模型复核支持 1 条），另有 0 条待确认。源码引用及工具来源已检查；未执行被审查代码，结论仍需结合实际测试。",
+      "findings": [
+        {
+          "title": "空筛选结果导致 selected[0] 抛出 IndexError",
+          "severity": "medium",
+          "category": "异常处理",
+          "line_start": 2,
+          "line_end": 3,
+          "explanation": "当 values 中不存在大于 0 的元素时，列表推导得到空列表，紧接着的 selected[0] 会抛出 IndexError。例如 first_positive([]) 或 first_positive([-1, 0]) 都会崩溃，调用方无法区分“没有正数”和真正的错误。",
+          "suggestion": "改为返回 None 或抛出带说明的异常，例如 next((v for v in values if v > 0), None)，并在文档中明确无正数时的返回值约定。",
+          "evidence": "selected = [value for value in values if value > 0]\n    return selected[0]",
+          "rule_id": "",
+          "evidence_role": "condition",
+          "related_evidence": [
+            {
+              "role": "consumer",
+              "line_start": 3,
+              "line_end": 3,
+              "evidence": "return selected[0]"
+            }
+          ],
+          "trigger": "调用 first_positive([]) 或 first_positive([-1, 0])，即输入中没有任何大于 0 的元素",
+          "trigger_basis": "local_input",
+          "verification": "reviewed",
+          "review_note": "values 中无大于 0 的元素时列表推导返回空列表，selected[0] 必然抛 IndexError，如 first_positive([]) 或 first_positive([-1,0])。",
+          "impact": "",
+          "verification_hint": ""
+        }
+      ],
+      "pending_findings": [],
+      "verification_records": [
+        {
+          "finding_id": 1,
+          "title": "空筛选结果导致 selected[0] 抛出 IndexError",
+          "status": "accepted",
+          "reason": "values 中无大于 0 的元素时列表推导返回空列表，selected[0] 必然抛 IndexError，如 first_positive([]) 或 first_positive([-1,0])。"
+        }
+      ],
+      "semantic_facts": [],
+      "calculations": [],
+      "limitations": [
+        "源码事实与静态规则有适用条件；未执行代码或测试，模型复核仍可能误报或漏报。",
+        "仅审查该单文件函数，未提供调用方对返回值/异常的处理约定，无法判断崩溃是否被上层捕获。"
+      ],
+      "reflection_status": "completed",
+      "checks": {
+        "Python 语法与结构": "completed",
+        "内置 AST 规则": "completed",
+        "Ruff 静态检查": "completed"
+      },
+      "events": [
+        {
+          "stage": "输入校验",
+          "detail": "positive.py · Python · 3 行 · 快照 5bbf87e31b7c"
+        },
+        {
+          "stage": "源码事实核对",
+          "detail": "提取 0 条计算/API 事实；未执行被审查代码。"
+        },
+        {
+          "stage": "工具规划",
+          "detail": "第 1 轮：可继续调用工具，也可直接输出报告 JSON。"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "parse_structure · 结果已返回"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "run_static_checks · 结果已返回"
+        },
+        {
+          "stage": "工具反馈与初审",
+          "detail": "第 2 轮：可继续调用工具，也可直接输出报告 JSON。"
+        },
+        {
+          "stage": "证据校验",
+          "detail": "1 条候选需复核（高/中优先级或证据链/工具背书检查）；普通低优先级意见仍可待确认。"
+        },
+        {
+          "stage": "反思复核",
+          "detail": "按事实逐条返回简短裁决，仅修正必要字段。"
+        },
+        {
+          "stage": "报告完成",
+          "detail": "保留 1 条问题与建议，0 条待确认。"
+        }
+      ],
+      "metrics": {
+        "model_calls": 3,
+        "http_attempts": 3,
+        "tool_calls": 2,
+        "prompt_tokens": 8049,
+        "completion_tokens": 438,
+        "elapsed_seconds": 3.12,
+        "stages": [
+          {
+            "stage": "源码事实核对",
+            "kind": "local",
+            "elapsed_seconds": 0.0,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "工具规划",
+            "kind": "model",
+            "elapsed_seconds": 0.519,
+            "model_calls": 1,
+            "http_attempts": 1,
+            "prompt_tokens": 2915,
+            "completion_tokens": 37,
+            "status": "completed"
+          },
+          {
+            "stage": "parse_structure",
+            "kind": "tool",
+            "elapsed_seconds": 0.0,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "run_static_checks",
+            "kind": "tool",
+            "elapsed_seconds": 0.15,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "工具反馈与初审",
+            "kind": "model",
+            "elapsed_seconds": 1.647,
+            "model_calls": 1,
+            "http_attempts": 1,
+            "prompt_tokens": 2901,
+            "completion_tokens": 281,
+            "status": "completed"
+          },
+          {
+            "stage": "证据校验",
+            "kind": "local",
+            "elapsed_seconds": 0.001,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "反思复核",
+            "kind": "model",
+            "elapsed_seconds": 0.798,
+            "model_calls": 1,
+            "http_attempts": 1,
+            "prompt_tokens": 2233,
+            "completion_tokens": 120,
+            "status": "completed"
+          },
+          {
+            "stage": "报告整理",
+            "kind": "local",
+            "elapsed_seconds": 0.001,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          }
+        ]
+      },
+      "created_at": "2026-09-28T12:30:54.532417+00:00"
+    }
+  }
+]

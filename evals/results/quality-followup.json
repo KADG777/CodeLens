@@ -1,0 +1,434 @@
+[
+  {
+    "id": "roi_stale_claim",
+    "filename": "roi.py",
+    "code": "import numpy as np\n\ndef example():\n    frame = np.zeros((120, 160, 3), dtype=np.uint8)\n    height, width = frame.shape[:2]\n    box_size = 200\n    x1, y1 = (width - box_size) // 2, (height - box_size) // 2\n    x2, y2 = x1 + box_size, y1 + box_size\n    roi = frame[y1:y2, x1:x2]\n    assert roi.shape == (40, 20, 3)\n    return roi\n",
+    "questions": [
+      "旧报告说这个 ROI 在 160×120 下为空并崩溃，你核对后解释一下，不要改代码。"
+    ],
+    "expected": [
+      "纠正旧报告为空的误报；给出 (40,20,3)；不再以必崩为修改理由"
+    ],
+    "legacy_pending": {
+      "title": "低分辨率下 ROI 为空",
+      "severity": "medium",
+      "category": "Bug",
+      "line_start": 9,
+      "line_end": 9,
+      "explanation": "160×120 会得到空数组并崩溃。",
+      "suggestion": "防止空 ROI。",
+      "evidence": "roi = frame[y1:y2, x1:x2]"
+    },
+    "history": [
+      {
+        "role": "assistant",
+        "content": "之前的推测：这个 ROI 肯定是空的。"
+      }
+    ],
+    "model": "deepseek-flash",
+    "source_hash": "f005fee8d75b",
+    "turns": [
+      {
+        "question": "旧报告说这个 ROI 在 160×120 下为空并崩溃，你核对后解释一下，不要改代码。",
+        "answer": "此算例的 ROI 非空。frame.shape=(120,160,3), box_size=200 时，原 y/x 切片起点为 [-40, -20]，终点为 [160, 180]；标准化切片为 [[80, 120, 1], [140, 160, 1]]，输出形状为 [40, 20, 3]。负索引先加该轴长度，再裁剪到合法范围，不能直接把负起点改为 0。 因而不能以“空 ROI 崩溃”为修改理由。负起点会使取样区域偏离中心；是否需要修改取决于你要求的裁剪区域，不能把未知意图当成缺陷。\n\n依据：源码事实 fact_1 · L5–L9（有适用条件）。\n\n**建议验证（未执行）**\n\n1. 在独立小样例中构造 np.zeros((120,160,3))，取 box_size=200，按源码公式切片，核对 roi.shape 为 [40, 20, 3]、roi.size > 0。\n\n依赖 NumPy 基本切片语义；不涵盖零尺寸、非数组对象或其他预处理错误。\n\n本回答直接使用本地计算事实，未调用语言模型或执行上传代码。\n\n以上依据当前代码快照；未执行代码或验证模型效果。",
+        "status": "completed",
+        "metrics": {
+          "model_calls": 0,
+          "http_attempts": 0,
+          "tool_calls": 0,
+          "prompt_tokens": 0,
+          "completion_tokens": 0,
+          "elapsed_seconds": 0.002,
+          "stages": [
+            {
+              "stage": "追问事实直答",
+              "kind": "local",
+              "elapsed_seconds": 0.002,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            }
+          ]
+        },
+        "checks": [
+          "已识别的计算/API 合同问题直接使用本地事实回答，未调用模型。"
+        ],
+        "patch_count": 0,
+        "raw_candidates": []
+      }
+    ],
+    "developer_review": {
+      "reviewed": true,
+      "passed": true,
+      "reviewer": "Codex 开发复查，非独立盲评",
+      "notes": "本地源码绑定计算直答，正确给出 (40,20,3)，不把偏离中心上升为已确认缺陷。"
+    }
+  },
+  {
+    "id": "keras_contract",
+    "filename": "holdout.py",
+    "code": "import numpy as np\nfrom keras import Sequential\nfrom keras.layers import Dense, Input\n\ndef train():\n    x = np.arange(1400, dtype=np.float32).reshape(700, 2)\n    y = np.arange(700) % 2\n    model = Sequential([Input(shape=(2,)), Dense(1, activation=\"sigmoid\")])\n    model.compile(optimizer=\"adam\", loss=\"binary_crossentropy\")\n    model.fit(x, y, epochs=1, validation_split=0.2, shuffle=True)\n    return model\n",
+    "questions": [
+      "这里 validation_split 是随机切分吗？同源数据能证明数据泄漏吗？只解释，不要代码。"
+    ],
+    "expected": [
+      "末尾留出，打乱前划分；留出样本不参与该次训练；不能仅凭同源认定泄漏"
+    ],
+    "model": "deepseek-flash",
+    "source_hash": "db482f08ab33",
+    "turns": [
+      {
+        "question": "这里 validation_split 是随机切分吗？同源数据能证明数据泄漏吗？只解释，不要代码。",
+        "answer": "Keras Model.fit 对 NumPy/张量输入使用 validation_split 时，先取末尾样本作验证，再打乱训练部分；验证部分不用于本次 fit 的训练。validation_data 非空时覆盖 validation_split。同源不等于样本重叠或泄漏，也不能单凭同源断言指标虚高；独立测试集是另一个评估问题。\n\n依据：源码事实 fact_1 · L10–L10（有适用条件）。\n\n**建议验证（未执行）**\n\n1. 给样本保留索引 ID，核对训练/验证索引区间没有重叠；另外检查重复样本，以及预处理是否在划分前使用全部数据拟合。\n2. 若需要评价泛化，在验证集选择参数后，使用未参与训练与调参的同一独立测试集对照。\n\n合同事实适用于已识别的标准 Keras fit 调用，不代表已检查真实数据是否泄漏。\n\n本回答直接使用源码绑定的 API 合同事实，未调用语言模型或执行上传代码。\n\n以上依据当前代码快照；未执行代码或验证模型效果。",
+        "status": "completed",
+        "metrics": {
+          "model_calls": 0,
+          "http_attempts": 0,
+          "tool_calls": 0,
+          "prompt_tokens": 0,
+          "completion_tokens": 0,
+          "elapsed_seconds": 0.001,
+          "stages": [
+            {
+              "stage": "追问事实直答",
+              "kind": "local",
+              "elapsed_seconds": 0.001,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            }
+          ]
+        },
+        "checks": [
+          "已识别的计算/API 合同问题直接使用本地事实回答，未调用模型。"
+        ],
+        "patch_count": 0,
+        "raw_candidates": []
+      }
+    ],
+    "developer_review": {
+      "reviewed": true,
+      "passed": true,
+      "reviewer": "Codex 开发复查，非独立盲评",
+      "notes": "本地合同直答，末尾留出且验证样本不参与该次训练；同源不证明泄漏。"
+    }
+  },
+  {
+    "id": "python_patch_and_memory",
+    "filename": "empty_average.py",
+    "code": "def average(values):\n    return sum(values) / len(values)\n",
+    "questions": [
+      "请修复空列表导致除零的问题，保持 average 函数名，不要改成默默返回 0。",
+      "沿用你刚才选择的空列表处理方式，只解释并给出两个具体测试输入及预期结果，不要重复代码。"
+    ],
+    "expected": [
+      "直接给出空列表显式报错的可定位补丁；无新未定义名称；第二轮记住第一轮方案；验证包含正常及空输入"
+    ],
+    "model": "deepseek-flash",
+    "source_hash": "487b1ab0923a",
+    "turns": [
+      {
+        "question": "请修复空列表导致除零的问题，保持 average 函数名，不要改成默默返回 0。",
+        "answer": "空列表时 `len(values)==0`，`sum(values)/len(values)` 会抛 `ZeroDivisionError`。修复方向是显式拒绝空输入：抛出带说明的 `ValueError`，而不是返回 0 掩盖问题。下面补丁保留函数名与原有算法，仅增加空输入检查。应用补丁后，非空输入行为不变；空输入由 `ZeroDivisionError` 变为 `ValueError`，调用方需按需捕获。\n\n**替换原文件 L1–L2**：显式拒绝空输入，避免除零，同时不改变非空输入的计算逻辑与函数签名。\n\n````python\ndef average(values):\n    if not values:\n        raise ValueError(\"average() requires a non-empty sequence\")\n    return sum(values) / len(values)\n````\n\n**建议验证（未执行）**\n\n1. 调用 `average([1, 2, 3])`，确认返回 2.0，与修改前一致。\n2. 调用 `average([])`，确认抛出 `ValueError` 且消息包含 non-empty，而非 `ZeroDivisionError`。\n3. 调用 `average([0])`，确认返回 0.0，验证不会把合法零值误判为空。\n4. 若调用方依赖旧异常类型，检查其 `except ZeroDivisionError` 分支是否需要改为 `except ValueError`。\n\n未执行代码或测试，以上行为为静态推断。\n\n未定义空输入时调用方期望的语义（报错还是返回 None），此处按“不默默返回 0”的要求选择抛错。\n\n补丁已通过源码位置与本地语法检查，仅为文本建议；未修改原文件、未运行测试，也未验证识别率。",
+        "status": "completed",
+        "metrics": {
+          "model_calls": 2,
+          "http_attempts": 2,
+          "tool_calls": 0,
+          "prompt_tokens": 1929,
+          "completion_tokens": 424,
+          "elapsed_seconds": 3.62,
+          "stages": [
+            {
+              "stage": "追问生成",
+              "kind": "model",
+              "elapsed_seconds": 2.278,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 1100,
+              "completion_tokens": 365,
+              "status": "completed"
+            },
+            {
+              "stage": "追问本地校验",
+              "kind": "local",
+              "elapsed_seconds": 0.322,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            },
+            {
+              "stage": "追问方案复核",
+              "kind": "model",
+              "elapsed_seconds": 1.018,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 829,
+              "completion_tokens": 59,
+              "status": "completed"
+            }
+          ]
+        },
+        "checks": [
+          "引用、已知事实冲突与补丁检查完成；不构成一般语义正确性证明。",
+          "修改方案获得模型复核支持，未执行代码或验证效果。"
+        ],
+        "patch_count": 1,
+        "raw_candidates": [
+          {
+            "role": "assistant",
+            "content": "{\"answer\":\"空列表时 `len(values)==0`，`sum(values)/len(values)` 会抛 `ZeroDivisionError`。修复方向是显式拒绝空输入：抛出带说明的 `ValueError`，而不是返回 0 掩盖问题。下面补丁保留函数名与原有算法，仅增加空输入检查。应用补丁后，非空输入行为不变；空输入由 `ZeroDivisionError` 变为 `ValueError`，调用方需按需捕获。\",\"patches\":[{\"line_start\":1,\"line_end\":2,\"original\":\"def average(values):\\n    return sum(values) / len(values)\",\"replacement\":\"def average(values):\\n    if not values:\\n        raise ValueError(\\\"average() requires a non-empty sequence\\\")\\n    return sum(values) / len(values)\",\"rationale\":\"显式拒绝空输入，避免除零，同时不改变非空输入的计算逻辑与函数签名。\"}],\"validation_steps\":[\"调用 `average([1, 2, 3])`，确认返回 2.0，与修改前一致。\",\"调用 `average([])`，确认抛出 `ValueError` 且消息包含 non-empty，而非 `ZeroDivisionError`。\",\"调用 `average([0])`，确认返回 0.0，验证不会把合法零值误判为空。\",\"若调用方依赖旧异常类型，检查其 `except ZeroDivisionError` 分支是否需要改为 `except ValueError`。\"],\"limitations\":[\"未执行代码或测试，以上行为为静态推断。\",\"未定义空输入时调用方期望的语义（报错还是返回 None），此处按“不默默返回 0”的要求选择抛错。\"]}"
+          },
+          {
+            "role": "assistant",
+            "content": "{\"verdict\":\"supported\",\"reason\":\"候选补丁保留 average 函数名，显式对空输入抛出 ValueError，未默默返回 0，非空输入逻辑不变；验证步骤覆盖非空、空列表、合法零值及异常类型变更，符合最新请求。\"}"
+          }
+        ]
+      },
+      {
+        "question": "沿用你刚才选择的空列表处理方式，只解释并给出两个具体测试输入及预期结果，不要重复代码。",
+        "answer": "沿用上一轮选择：空输入显式抛 `ValueError`，不返回 0，非空输入算法与函数名不变。原快照 L1–L2 仍是 `sum(values)/len(values)`，未修改；应用补丁后空列表会先被拦截，因此不再触发 `ZeroDivisionError`。下面只给两个具体测试输入及预期，不重复代码。\n\n**建议验证（未执行）**\n\n1. 输入 `average([])`：预期抛出 `ValueError`，消息含 non-empty；不应出现 `ZeroDivisionError`，也不应返回 0。\n2. 输入 `average([0])`：预期返回 0.0，用于确认合法零值不会被误判为空输入。\n3. 对照方法：在未打补丁的原快照上运行同一输入，`average([])` 预期为 `ZeroDivisionError`，`average([0])` 预期为 0.0，以此确认补丁只改变空输入路径。\n\n未执行代码或测试，以上为静态推断。\n\n未定义调用方对空输入是期望报错还是返回 None，此处按“不默默返回 0”的要求选择抛错。\n\n以上依据当前代码快照；未执行代码或验证模型效果。",
+        "status": "completed",
+        "metrics": {
+          "model_calls": 1,
+          "http_attempts": 1,
+          "tool_calls": 0,
+          "prompt_tokens": 1538,
+          "completion_tokens": 259,
+          "elapsed_seconds": 1.62,
+          "stages": [
+            {
+              "stage": "追问生成",
+              "kind": "model",
+              "elapsed_seconds": 1.616,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 1538,
+              "completion_tokens": 259,
+              "status": "completed"
+            },
+            {
+              "stage": "追问本地校验",
+              "kind": "local",
+              "elapsed_seconds": 0.0,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            }
+          ]
+        },
+        "checks": [
+          "引用、已知事实冲突与补丁检查完成；不构成一般语义正确性证明。"
+        ],
+        "patch_count": 0,
+        "raw_candidates": [
+          {
+            "role": "assistant",
+            "content": "{\"answer\":\"沿用上一轮选择：空输入显式抛 `ValueError`，不返回 0，非空输入算法与函数名不变。原快照 L1–L2 仍是 `sum(values)/len(values)`，未修改；应用补丁后空列表会先被拦截，因此不再触发 `ZeroDivisionError`。下面只给两个具体测试输入及预期，不重复代码。\",\"patches\":[],\"validation_steps\":[\"输入 `average([])`：预期抛出 `ValueError`，消息含 non-empty；不应出现 `ZeroDivisionError`，也不应返回 0。\",\"输入 `average([0])`：预期返回 0.0，用于确认合法零值不会被误判为空输入。\",\"对照方法：在未打补丁的原快照上运行同一输入，`average([])` 预期为 `ZeroDivisionError`，`average([0])` 预期为 0.0，以此确认补丁只改变空输入路径。\"],\"limitations\":[\"未执行代码或测试，以上为静态推断。\",\"未定义调用方对空输入是期望报错还是返回 None，此处按“不默默返回 0”的要求选择抛错。\"]}"
+          }
+        ]
+      }
+    ],
+    "developer_review": {
+      "reviewed": true,
+      "passed": true,
+      "reviewer": "Codex 开发复查，非独立盲评",
+      "notes": "补丁保留接口，空列表显式 ValueError，正常列表行为不变；第二轮沿用前轮约定。未实际执行建议代码。"
+    }
+  },
+  {
+    "id": "cpp_patch",
+    "filename": "release.cpp",
+    "code": "void release() {\n    int* data = new int[4];\n    delete data;\n}\n",
+    "questions": [
+      "请直接修复这段 C++ 的内存释放问题，保留函数接口，给出修改代码。"
+    ],
+    "expected": [
+      "delete[] 与 new[] 配对；源码位置正确；明确未编译运行"
+    ],
+    "model": "deepseek-flash",
+    "source_hash": "df430410dddc",
+    "turns": [
+      {
+        "question": "请直接修复这段 C++ 的内存释放问题，保留函数接口，给出修改代码。",
+        "answer": "问题确认：第 2 行用 `new int[4]` 分配数组，第 3 行却用标量 `delete` 释放，数组形式不匹配，属未定义行为（finding:1）。最小修复是把释放改为 `delete[] data;`，函数签名与行为不变。若允许改动实现风格，可改用 `std::vector<int>` 自动管理内存，但需引入 `<vector>`，此处按“保留接口、最小改动”只做配对修正。\n\n依据：问题 1（规则命中/模型支持，未运行验证）。\n\n**替换原文件 L3–L3**：new[] 必须与 delete[] 配对，避免数组释放形式不匹配导致的未定义行为。\n\n````cpp\n    delete[] data;\n````\n\n**建议验证（未执行）**\n\n1. 静态检查：确认第 2 行为 `new int[4]`、第 3 行为 `delete[] data;`，两者数组形式一致。\n2. 编译验证：用 `g++ -std=c++17 -Wall -Wextra -fsyntax-only release.cpp` 检查语法与告警（需自行执行，本回答未运行）。\n3. 动态验证：在 ASan 下编译运行 `g++ -std=c++17 -fsanitize=address -g release.cpp`，调用 release() 后确认无 new/delete 不匹配报错。\n4. 对照方法：保留原 `delete data;` 版本在 ASan 下运行，观察是否出现 alloc-dealloc-mismatch，与补丁后结果对比。\n\n未执行编译或运行，以上仅为静态建议。\n\n若该指针实际指向单对象而非数组，则不应改为 delete[]，需结合完整上下文确认。\n\n补丁已通过源码位置与本地语法检查，仅为文本建议；未修改原文件、未运行测试，也未验证识别率。",
+        "status": "completed",
+        "metrics": {
+          "model_calls": 2,
+          "http_attempts": 2,
+          "tool_calls": 0,
+          "prompt_tokens": 2420,
+          "completion_tokens": 442,
+          "elapsed_seconds": 2.89,
+          "stages": [
+            {
+              "stage": "追问生成",
+              "kind": "model",
+              "elapsed_seconds": 2.001,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 1339,
+              "completion_tokens": 382,
+              "status": "completed"
+            },
+            {
+              "stage": "追问本地校验",
+              "kind": "local",
+              "elapsed_seconds": 0.001,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            },
+            {
+              "stage": "追问方案复核",
+              "kind": "model",
+              "elapsed_seconds": 0.883,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 1081,
+              "completion_tokens": 60,
+              "status": "completed"
+            }
+          ]
+        },
+        "checks": [
+          "引用、已知事实冲突与补丁检查完成；不构成一般语义正确性证明。",
+          "修改方案获得模型复核支持，未执行代码或验证效果。"
+        ],
+        "patch_count": 1,
+        "raw_candidates": [
+          {
+            "role": "assistant",
+            "content": "{\"answer\":\"问题确认：第 2 行用 `new int[4]` 分配数组，第 3 行却用标量 `delete` 释放，数组形式不匹配，属未定义行为（finding:1）。最小修复是把释放改为 `delete[] data;`，函数签名与行为不变。若允许改动实现风格，可改用 `std::vector<int>` 自动管理内存，但需引入 `<vector>`，此处按“保留接口、最小改动”只做配对修正。\",\"patches\":[{\"line_start\":3,\"line_end\":3,\"original\":\"    delete data;\",\"replacement\":\"    delete[] data;\",\"rationale\":\"new[] 必须与 delete[] 配对，避免数组释放形式不匹配导致的未定义行为。\"}],\"references\":[\"finding:1\"],\"validation_steps\":[\"静态检查：确认第 2 行为 `new int[4]`、第 3 行为 `delete[] data;`，两者数组形式一致。\",\"编译验证：用 `g++ -std=c++17 -Wall -Wextra -fsyntax-only release.cpp` 检查语法与告警（需自行执行，本回答未运行）。\",\"动态验证：在 ASan 下编译运行 `g++ -std=c++17 -fsanitize=address -g release.cpp`，调用 release() 后确认无 new/delete 不匹配报错。\",\"对照方法：保留原 `delete data;` 版本在 ASan 下运行，观察是否出现 alloc-dealloc-mismatch，与补丁后结果对比。\"],\"limitations\":[\"未执行编译或运行，以上仅为静态建议。\",\"若该指针实际指向单对象而非数组，则不应改为 delete[]，需结合完整上下文确认。\"]}"
+          },
+          {
+            "role": "assistant",
+            "content": "{\"verdict\":\"supported\",\"reason\":\"候选正确识别 new[]/delete 不匹配，补丁将第3行改为 delete[] data;，保留函数接口，并明确标注未执行编译/运行，验证步骤具体可操作。未发现确定错误或未完成要求。\"}"
+          }
+        ]
+      }
+    ],
+    "developer_review": {
+      "reviewed": true,
+      "passed": true,
+      "reviewer": "Codex 开发复查，非独立盲评",
+      "notes": "定位第3行，delete 改为 delete[]，保留 void release()；明确编译/ASan 为待执行步骤。"
+    }
+  },
+  {
+    "id": "recognition_preprocessing",
+    "filename": "recognizer.py",
+    "code": "import cv2\nimport numpy as np\n\n\ndef training_pixels(images):\n    return np.stack([cv2.resize(x, (20, 20)) for x in images]).astype(np.float32) / 255.0\n\n\ndef camera_pixels(gray_roi):\n    binary = cv2.adaptiveThreshold(gray_roi, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\n                                   cv2.THRESH_BINARY_INV, 11, 2)\n    thick = cv2.dilate(binary, np.ones((3, 3), np.uint8), iterations=1)\n    return cv2.resize(thick, (20, 20)).astype(np.float32) / 255.0\n",
+    "questions": [
+      "帮我优化代码提高识别率，优先统一训练和推理预处理。训练图像是黑底白字，摄像头输入是灰度白底黑字。直接给局部改写和验证步骤。"
+    ],
+    "expected": [
+      "提供实际局部代码；两端空间缩放、归一化和极性一致；不承诺提高识别率；保留同一独立测试集比较；明确没有训练或实测"
+    ],
+    "model": "deepseek-flash",
+    "source_hash": "66a31ab3decf",
+    "turns": [
+      {
+        "question": "帮我优化代码提高识别率，优先统一训练和推理预处理。训练图像是黑底白字，摄像头输入是灰度白底黑字。直接给局部改写和验证步骤。",
+        "answer": "结论：上一版只共享了缩放/归一化，未消除阈值与形态学差异。按“保留训练路径、把推理适配到训练”的原则：训练端保持原样（无阈值、无形态学、无滤波），推理端只保留把白底黑字转成黑底白字所必需的极性翻转，去掉 adaptiveThreshold 与 dilate，再复用同一缩放归一化。应用补丁后，两条路径的算子集合一致（仅 resize + /255），差异只剩推理端必需的极性适配。\n\n**替换原文件 L5–L13**：保留训练端原处理，推理端仅保留极性适配并复用共享缩放归一化，移除推理额外的阈值与膨胀。\n\n````python\ndef _to_model_input(images):\n    \"\"\"共享缩放与归一化，保持训练端原有处理。\"\"\"\n    return np.stack([cv2.resize(x, (20, 20)) for x in images]).astype(np.float32) / 255.0\n\n\ndef training_pixels(images):\n    # 训练图已是黑底白字，保持原处理不变\n    return _to_model_input(images)\n\n\ndef camera_pixels(gray_roi):\n    # 白底黑字 -> 极性翻转为黑底白字，与训练一致；不再做阈值/膨胀\n    inverted = 255 - gray_roi\n    return _to_model_input([inverted])[0]\n````\n\n**建议验证（未执行）**\n\n1. 构造同一字符的训练图（黑底白字）与摄像头灰度图（白底黑字），分别调用 training_pixels 与 camera_pixels，打印 shape、dtype、均值与前景像素占比，确认极性一致（前景为高值）且算子集合一致。\n2. 对同一 ROI 分别用旧 camera_pixels（含阈值+膨胀）与新实现输出并排可视化，确认笔画粗细与噪声差异来源。\n3. 固定同一独立测试集，比较修改前后识别准确率，报告均值与置信区间，不预设提升。\n\n未执行代码，仅静态改写；识别率变化需实测确认。\n\n去掉自适应阈值后，光照不均的 ROI 可能残留背景梯度，需验证集确认。\n\n若训练图本身含轻微模糊/噪声，推理端未做匹配滤波，分布仍可能有差异。\n\n补丁已通过源码位置与本地语法检查，仅为文本建议；未修改原文件、未运行测试，也未验证识别率。",
+        "status": "repaired",
+        "metrics": {
+          "model_calls": 3,
+          "http_attempts": 3,
+          "tool_calls": 0,
+          "prompt_tokens": 4867,
+          "completion_tokens": 1604,
+          "elapsed_seconds": 9.29,
+          "stages": [
+            {
+              "stage": "追问生成",
+              "kind": "model",
+              "elapsed_seconds": 4.179,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 1301,
+              "completion_tokens": 816,
+              "status": "completed"
+            },
+            {
+              "stage": "追问本地校验",
+              "kind": "local",
+              "elapsed_seconds": 0.287,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "failed"
+            },
+            {
+              "stage": "追问修正",
+              "kind": "model",
+              "elapsed_seconds": 3.292,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 2220,
+              "completion_tokens": 685,
+              "status": "completed"
+            },
+            {
+              "stage": "追问本地校验",
+              "kind": "local",
+              "elapsed_seconds": 0.324,
+              "model_calls": 0,
+              "http_attempts": 0,
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "status": "completed"
+            },
+            {
+              "stage": "追问方案复核",
+              "kind": "model",
+              "elapsed_seconds": 1.21,
+              "model_calls": 1,
+              "http_attempts": 1,
+              "prompt_tokens": 1346,
+              "completion_tokens": 103,
+              "status": "completed"
+            }
+          ]
+        },
+        "checks": [
+          "尚未统一预处理：training_pixels 的阈值/形态学/滤波操作为 []，camera_pixels 为 ['adaptiveThreshold', 'dilate']。只共享缩放和归一化没有消除这些差异。用户未要求引入新算法，应优先保留原训练处理，移除推理额外操作，不能把推理额外的阈值/膨胀强加到训练端；输入极性差异保留必要适配。",
+          "引用、已知事实冲突与补丁检查完成；不构成一般语义正确性证明。",
+          "修改方案获得模型复核支持，未执行代码或验证效果。"
+        ],
+        "patch_count": 1,
+        "raw_candidates": [
+          {
+            "role": "assistant",
+            "content": "{\"answer\":\"结论：训练与推理的极性确实相反——训练图是黑底白字（笔画为高值），而 camera_pixels 用 THRESH_BINARY_INV 把白底黑字转成白底黑字？实际是：白底黑字经 INV 后笔画变白（高值），与训练一致，但多出的 dilate 膨胀和自适应阈值会改变笔画粗细与噪声分布，属于训练端没有的额外变换。建议统一为：先统一极性（推理端保留 INV 使笔画为高值），再共享同一缩放归一化函数，并把膨胀/阈值参数化，默认关闭膨胀以对齐训练分布。应用补丁后，训练与推理都走 _to_model_input，仅推理端可选膨胀。\",\"patches\":[{\"line_start\":5,\"line_end\":13,\"original\":\"def training_pixels(images):\\n    return np.stack([cv2.resize(x, (20, 20)) for x in images]).astype(np.float32) / 255.0\\n\\n\\ndef camera_pixels(gray_roi):\\n    binary = cv2.adaptiveThreshold(gray_roi, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\\n                                   cv2.THRESH_BINARY_INV, 11, 2)\\n    thick = cv2.dilate(binary, np.ones((3, 3), np.uint8), iterations=1)\\n    return cv2.resize(thick, (20, 20)).astype(np.float32) / 255.0\",\"replacement\":\"def _to_model_input(images):\\n    \\\"\\\"\\\"共享缩放与归一化：输入为笔画高值(白字)的灰度/二值图。\\\"\\\"\\\"\\n    return np.stack([cv2.resize(x, (20, 20)) for x in images]).astype(np.float32) / 255.0\\n\\n\\ndef training_pixels(images):\\n    # 训练图已是黑底白字，直接复用共享预处理\\n    return _to_model_input(images)\\n\\n\\ndef camera_pixels(gray_roi, dilate_iterations=0):\\n    # 白底黑字 -> INV 后笔画为高值，与训练极性一致\\n    binary = cv2.adaptiveThreshold(gray_roi, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\\n                                   cv2.THRESH_BINARY_INV, 11, 2)\\n    if dilate_iterations > 0:\\n        binary = cv2.dilate(binary, np.ones((3, 3), np.uint8), iterations=dilate_iterations)\\n    return _to_model_input([binary])[0]\",\"rationale\":\"提取共享预处理，统一极性；膨胀改为可选且默认关闭，避免推理端额外变换偏离训练分布。\"}],\"references\":[],\"validation_steps\":[\"构造同一字符的训练图（黑底白字）与摄像头灰度图（白底黑字），分别调用 training_pixels 与 camera_pixels，打印两者 shape、dtype、均值与前景像素占比，确认极性一致（前景为高值）。\",\"在验证集上对比 dilate_iterations=0 与 1 的识别准确率，阈值/参数只在验证集选择。\",\"固定同一独立测试集，比较修改前后准确率，报告均值与置信区间，不预设提升。\"],\"limitations\":[\"未执行代码，仅静态改写；识别率变化需实测确认。\",\"自适应阈值块大小 11、常数 2 未调优，可能影响二值质量。\",\"膨胀默认关闭可能降低对细笔画的鲁棒性，需验证集确认。\"]}"
+          },
+          {
+            "role": "assistant",
+            "content": "{\"answer\":\"结论：上一版只共享了缩放/归一化，未消除阈值与形态学差异。按“保留训练路径、把推理适配到训练”的原则：训练端保持原样（无阈值、无形态学、无滤波），推理端只保留把白底黑字转成黑底白字所必需的极性翻转，去掉 adaptiveThreshold 与 dilate，再复用同一缩放归一化。应用补丁后，两条路径的算子集合一致（仅 resize + /255），差异只剩推理端必需的极性适配。\",\"patches\":[{\"line_start\":5,\"line_end\":13,\"original\":\"def training_pixels(images):\\n    return np.stack([cv2.resize(x, (20, 20)) for x in images]).astype(np.float32) / 255.0\\n\\n\\ndef camera_pixels(gray_roi):\\n    binary = cv2.adaptiveThreshold(gray_roi, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\\n                                   cv2.THRESH_BINARY_INV, 11, 2)\\n    thick = cv2.dilate(binary, np.ones((3, 3), np.uint8), iterations=1)\\n    return cv2.resize(thick, (20, 20)).astype(np.float32) / 255.0\",\"replacement\":\"def _to_model_input(images):\\n    \\\"\\\"\\\"共享缩放与归一化，保持训练端原有处理。\\\"\\\"\\\"\\n    return np.stack([cv2.resize(x, (20, 20)) for x in images]).astype(np.float32) / 255.0\\n\\n\\ndef training_pixels(images):\\n    # 训练图已是黑底白字，保持原处理不变\\n    return _to_model_input(images)\\n\\n\\ndef camera_pixels(gray_roi):\\n    # 白底黑字 -> 极性翻转为黑底白字，与训练一致；不再做阈值/膨胀\\n    inverted = 255 - gray_roi\\n    return _to_model_input([inverted])[0]\",\"rationale\":\"保留训练端原处理，推理端仅保留极性适配并复用共享缩放归一化，移除推理额外的阈值与膨胀。\"}],\"references\":[],\"validation_steps\":[\"构造同一字符的训练图（黑底白字）与摄像头灰度图（白底黑字），分别调用 training_pixels 与 camera_pixels，打印 shape、dtype、均值与前景像素占比，确认极性一致（前景为高值）且算子集合一致。\",\"对同一 ROI 分别用旧 camera_pixels（含阈值+膨胀）与新实现输出并排可视化，确认笔画粗细与噪声差异来源。\",\"固定同一独立测试集，比较修改前后识别准确率，报告均值与置信区间，不预设提升。\"],\"limitations\":[\"未执行代码，仅静态改写；识别率变化需实测确认。\",\"去掉自适应阈值后，光照不均的 ROI 可能残留背景梯度，需验证集确认。\",\"若训练图本身含轻微模糊/噪声，推理端未做匹配滤波，分布仍可能有差异。\"]}"
+          },
+          {
+            "role": "assistant",
+            "content": "{\"verdict\":\"supported\",\"reason\":\"候选正确识别了训练/推理预处理不一致：训练端无阈值/形态学，推理端有 adaptiveThreshold+dilate。补丁保留训练路径，推理端仅做极性翻转（255-gray_roi）以匹配黑底白字，并复用同一 resize+/255，算子集合一致。验证步骤覆盖极性、可视化差异与准确率对比，且未声称已执行或保证提升。未发现确定错误或未完成要求。\"}"
+          }
+        ]
+      }
+    ],
+    "developer_review": {
+      "reviewed": true,
+      "passed": true,
+      "reviewer": "Codex 开发复查，非独立盲评",
+      "notes": "首次候选只共享归一化，被本地处理链检查拒绝；修正后共享训练原流程，推理只先做 255-gray_roi，移除阈值与膨胀。未实测识别率。假设灰度输入为原先 OpenCV 所需的 uint8 范围，未扩展其他格式。"
+    }
+  }
+]

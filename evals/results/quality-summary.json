@@ -1,0 +1,504 @@
+{
+  "direct": {
+    "cases": 10,
+    "completed": 10,
+    "expected_defects": 5,
+    "recalled": 5,
+    "formal_recalled": 0,
+    "recall": 1.0,
+    "formal_recall": 0.0,
+    "counts": {
+      "findings": {},
+      "pending_findings": {
+        "matched": 5,
+        "needs_context": 3,
+        "advice": 5,
+        "incorrect": 2
+      },
+      "all": {
+        "matched": 5,
+        "needs_context": 3,
+        "advice": 5,
+        "incorrect": 2
+      }
+    },
+    "visible_items": 15,
+    "formal_items": 0,
+    "known_defect_fraction": 0.3333333333333333,
+    "formal_supported_fraction": null,
+    "rows": [
+      {
+        "id": "numpy_overlay_shape_mismatch",
+        "expected": 1,
+        "matched": 1,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "matched": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "numpy_where_tuple_valid",
+        "expected": 0,
+        "matched": 0,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "needs_context": 1,
+          "advice": 2
+        },
+        "failed": false
+      },
+      {
+        "id": "camera_cleanup_finally",
+        "expected": 0,
+        "matched": 0,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "advice": 2,
+          "needs_context": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "cpp_guarded_division",
+        "expected": 0,
+        "matched": 0,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {},
+        "failed": false
+      },
+      {
+        "id": "cpp_array_delete_mismatch",
+        "expected": 1,
+        "matched": 1,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "matched": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "empty_average",
+        "expected": 1,
+        "matched": 1,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "matched": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "undefined_name",
+        "expected": 1,
+        "matched": 1,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "matched": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "injection_comment",
+        "expected": 1,
+        "matched": 1,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "matched": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "centered_roi_nonempty",
+        "expected": 0,
+        "matched": 0,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "needs_context": 1,
+          "incorrect": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "keras_trailing_holdout",
+        "expected": 0,
+        "matched": 0,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "incorrect": 1,
+          "advice": 1
+        },
+        "failed": false
+      }
+    ],
+    "elapsed_seconds": {
+      "mean": 1.986,
+      "min": 0.72,
+      "max": 3.67
+    },
+    "model_calls": {
+      "mean": 1,
+      "min": 1,
+      "max": 1
+    },
+    "prompt_tokens": {
+      "mean": 1364.5,
+      "min": 1262,
+      "max": 1646
+    },
+    "completion_tokens": {
+      "mean": 334.3,
+      "min": 51,
+      "max": 746
+    }
+  },
+  "tools": {
+    "cases": 10,
+    "completed": 10,
+    "expected_defects": 5,
+    "recalled": 5,
+    "formal_recalled": 1,
+    "recall": 1.0,
+    "formal_recall": 0.2,
+    "counts": {
+      "findings": {
+        "matched": 1
+      },
+      "pending_findings": {
+        "incorrect": 4,
+        "matched": 4,
+        "advice": 10,
+        "needs_context": 3
+      },
+      "all": {
+        "matched": 5,
+        "incorrect": 4,
+        "advice": 10,
+        "needs_context": 3
+      }
+    },
+    "visible_items": 22,
+    "formal_items": 1,
+    "known_defect_fraction": 0.22727272727272727,
+    "formal_supported_fraction": 1.0,
+    "rows": [
+      {
+        "id": "numpy_overlay_shape_mismatch",
+        "expected": 1,
+        "matched": 1,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "incorrect": 1,
+          "matched": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "numpy_where_tuple_valid",
+        "expected": 0,
+        "matched": 0,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "advice": 2
+        },
+        "failed": false
+      },
+      {
+        "id": "camera_cleanup_finally",
+        "expected": 0,
+        "matched": 0,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "advice": 2,
+          "needs_context": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "cpp_guarded_division",
+        "expected": 0,
+        "matched": 0,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "incorrect": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "cpp_array_delete_mismatch",
+        "expected": 1,
+        "matched": 1,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "matched": 1,
+          "incorrect": 1,
+          "advice": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "empty_average",
+        "expected": 1,
+        "matched": 1,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "matched": 1,
+          "advice": 2
+        },
+        "failed": false
+      },
+      {
+        "id": "undefined_name",
+        "expected": 1,
+        "matched": 1,
+        "formal_matched": 1,
+        "missed": 0,
+        "counts": {
+          "matched": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "injection_comment",
+        "expected": 1,
+        "matched": 1,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "matched": 1,
+          "advice": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "centered_roi_nonempty",
+        "expected": 0,
+        "matched": 0,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "needs_context": 1,
+          "incorrect": 1,
+          "advice": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "keras_trailing_holdout",
+        "expected": 0,
+        "matched": 0,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "advice": 1,
+          "needs_context": 1
+        },
+        "failed": false
+      }
+    ],
+    "elapsed_seconds": {
+      "mean": 3.801,
+      "min": 2.61,
+      "max": 4.71
+    },
+    "model_calls": {
+      "mean": 2,
+      "min": 2,
+      "max": 2
+    },
+    "prompt_tokens": {
+      "mean": 4875.1,
+      "min": 4576,
+      "max": 5490
+    },
+    "completion_tokens": {
+      "mean": 570,
+      "min": 291,
+      "max": 859
+    }
+  },
+  "full": {
+    "cases": 10,
+    "completed": 10,
+    "expected_defects": 5,
+    "recalled": 5,
+    "formal_recalled": 5,
+    "recall": 1.0,
+    "formal_recall": 1.0,
+    "counts": {
+      "findings": {
+        "matched": 5,
+        "needs_context": 2
+      },
+      "pending_findings": {
+        "needs_context": 4,
+        "advice": 5,
+        "incorrect": 2
+      },
+      "all": {
+        "matched": 5,
+        "needs_context": 6,
+        "advice": 5,
+        "incorrect": 2
+      }
+    },
+    "visible_items": 18,
+    "formal_items": 7,
+    "known_defect_fraction": 0.2777777777777778,
+    "formal_supported_fraction": 0.7142857142857143,
+    "rows": [
+      {
+        "id": "numpy_overlay_shape_mismatch",
+        "expected": 1,
+        "matched": 1,
+        "formal_matched": 1,
+        "missed": 0,
+        "counts": {
+          "matched": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "numpy_where_tuple_valid",
+        "expected": 0,
+        "matched": 0,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "needs_context": 1,
+          "advice": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "camera_cleanup_finally",
+        "expected": 0,
+        "matched": 0,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "advice": 1,
+          "needs_context": 2
+        },
+        "failed": false
+      },
+      {
+        "id": "cpp_guarded_division",
+        "expected": 0,
+        "matched": 0,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "incorrect": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "cpp_array_delete_mismatch",
+        "expected": 1,
+        "matched": 1,
+        "formal_matched": 1,
+        "missed": 0,
+        "counts": {
+          "matched": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "empty_average",
+        "expected": 1,
+        "matched": 1,
+        "formal_matched": 1,
+        "missed": 0,
+        "counts": {
+          "needs_context": 1,
+          "matched": 1,
+          "advice": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "undefined_name",
+        "expected": 1,
+        "matched": 1,
+        "formal_matched": 1,
+        "missed": 0,
+        "counts": {
+          "matched": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "injection_comment",
+        "expected": 1,
+        "matched": 1,
+        "formal_matched": 1,
+        "missed": 0,
+        "counts": {
+          "matched": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "centered_roi_nonempty",
+        "expected": 0,
+        "matched": 0,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "needs_context": 1,
+          "incorrect": 1,
+          "advice": 1
+        },
+        "failed": false
+      },
+      {
+        "id": "keras_trailing_holdout",
+        "expected": 0,
+        "matched": 0,
+        "formal_matched": 0,
+        "missed": 0,
+        "counts": {
+          "advice": 1,
+          "needs_context": 1
+        },
+        "failed": false
+      }
+    ],
+    "elapsed_seconds": {
+      "mean": 4.451,
+      "min": 2.84,
+      "max": 6.73
+    },
+    "model_calls": {
+      "mean": 2.7,
+      "min": 2,
+      "max": 3
+    },
+    "prompt_tokens": {
+      "mean": 6038.1,
+      "min": 4731,
+      "max": 7538
+    },
+    "completion_tokens": {
+      "mean": 648.8,
+      "min": 337,
+      "max": 1111
+    }
+  }
+}

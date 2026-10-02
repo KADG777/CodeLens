@@ -1,0 +1,1085 @@
+[
+  {
+    "version": "before",
+    "repeat": 1,
+    "source_hash": "38cef250f458",
+    "filename": "performance_fixture.py",
+    "engine_root": "D:\\大三上课程\\软件工程项目实践\\reports\\baseline_v2",
+    "model": "deepseek-flash",
+    "report": {
+      "schema_version": 2,
+      "filename": "performance_fixture.py",
+      "language": "python",
+      "source_hash": "38cef250f458",
+      "mode": "deepseek",
+      "model": "deepseek-flash",
+      "strategy": "full",
+      "summary": "本次保留 2 条问题与建议（静态规则命中 0 条，模型复核支持 2 条），另有 0 条待确认。源码引用及工具来源已检查；未执行被审查代码，结论仍需结合实际测试。",
+      "findings": [
+        {
+          "title": "crop 在图像小于 box_size 时产生负索引，裁剪区域错误或为空",
+          "severity": "high",
+          "category": "Bug",
+          "line_start": 20,
+          "line_end": 22,
+          "explanation": "触发条件：调用 crop(frame) 且 frame 的高度或宽度小于 box_size=200，例如 frame.shape=(80,90,3)。\n影响：返回的 ROI 尺寸与预期中心裁剪不符（示例中为 60x55 而非 200x200），下游若按固定尺寸使用会得到错误区域或形状不匹配。",
+          "suggestion": "在计算前校验尺寸，或对起始坐标做 clamp：x1=max(0,(width-box_size)//2)，y1=max(0,(height-box_size)//2)，并令 x2=min(width,x1+box_size)、y2=min(height,y1+box_size)；若要求固定输出尺寸，应在尺寸不足时显式抛出 ValueError 或先 resize。",
+          "evidence": "x1, y1 = (width - box_size) // 2, (height - box_size) // 2\n    x2, y2 = x1 + box_size, y1 + box_size\n    roi = frame[y1:y2, x1:x2]",
+          "rule_id": "",
+          "verification": "reviewed",
+          "review_note": "候选描述的机制成立：当 frame 的宽或高小于 box_size=200 时，(width-box_size)//2 与 (height-box_size)//2 为负，Python 负索引会从末尾计数，切片结果不是预期的中心 200x200 区域，而是尺寸错误的区域。以 (80,90,3) 为例，x1=-55、y1=-60，frame[-60:140, -55:145] 实际得到 60x55 的区域，与预期不符。这是当前代码在给定输入下即可说明的行为，属于 local_code。 反例检查：取 frame=np.zeros((80,90,3))：x1=(90-200)//2=-55，y1=(80-200)//2=-60，x2=145，y2=140。切片 frame[-60:140,-55:145] 中 -60 等价于 20、-55 等价于 35，得到 shape (60,55,3)，而非 200x200 或整图；说明负索引导致裁剪区域错误。",
+          "trigger": "调用 crop(frame) 且 frame 的高度或宽度小于 box_size=200，例如 frame.shape=(80,90,3)。",
+          "impact": "返回的 ROI 尺寸与预期中心裁剪不符（示例中为 60x55 而非 200x200），下游若按固定尺寸使用会得到错误区域或形状不匹配。",
+          "verification_hint": "用 frame=np.zeros((80,90,3)) 调用 crop，观察返回数组的 shape；预期当前实现返回 (60,55,3)，而按中心裁剪语义应返回整图或报错。"
+        },
+        {
+          "title": "preview_overlay 中 preview 尺寸大于 frame，赋值依赖广播且语义不清",
+          "severity": "medium",
+          "category": "Bug",
+          "line_start": 29,
+          "line_end": 29,
+          "explanation": "触发条件：调用 preview_overlay()，其中 frame 为 (80,90,3)、preview 为 (100,100,3)。\n影响：第 29 行赋值抛出 ValueError，函数无法返回，调用方拿不到结果。",
+          "suggestion": "将 preview 裁剪到 frame 尺寸后再赋值，例如 frame[:preview.shape[0], :preview.shape[1]] = preview[:frame.shape[0], :frame.shape[1]]，或先确保 preview 不大于 frame，或使用 cv2.addWeighted 等叠加方式并保证尺寸一致。",
+          "evidence": "frame[:100, :100] = preview",
+          "rule_id": "",
+          "verification": "reviewed",
+          "review_note": "frame 形状为 (80,90,3)，frame[:100,:100] 因越界切片实际形状为 (80,90,3)，右侧 preview 为 (100,100,3)。NumPy 赋值要求形状可广播，尾部维度 90 与 100 不匹配，会抛出 ValueError，函数无法返回。候选对广播失败机制的描述正确，属于 local_code。 反例检查：frame=np.zeros((80,90,3))，preview=np.zeros((100,100,3))；frame[:100,:100] 的形状是 (80,90,3)，preview 是 (100,100,3)，90 与 100 不可广播，赋值会抛 ValueError: could not broadcast input array from shape (100,100,3) into shape (80,90,3)。",
+          "trigger": "调用 preview_overlay()，其中 frame 为 (80,90,3)、preview 为 (100,100,3)。",
+          "impact": "第 29 行赋值抛出 ValueError，函数无法返回，调用方拿不到结果。",
+          "verification_hint": "直接调用 preview_overlay()，观察是否抛出 ValueError: could not broadcast input array from shape (100,100,3) into shape (80,90,3)。"
+        }
+      ],
+      "pending_findings": [],
+      "verification_records": [
+        {
+          "finding_id": 2,
+          "title": "preview_overlay 中 preview 尺寸大于 frame，赋值依赖广播且语义不清",
+          "status": "relocated",
+          "reason": "按原样证据将 L27–L29 校正为 L29–L29。"
+        },
+        {
+          "finding_id": 3,
+          "title": "train 中标签 y 为 int64，与二分类损失的类型约定不一致",
+          "status": "relocated",
+          "reason": "按原样证据将 L10–L13 校正为 L10–L10。"
+        },
+        {
+          "finding_id": 1,
+          "title": "crop 在图像小于 box_size 时产生负索引，裁剪区域错误或为空",
+          "status": "accepted",
+          "reason": "候选描述的机制成立：当 frame 的宽或高小于 box_size=200 时，(width-box_size)//2 与 (height-box_size)//2 为负，Python 负索引会从末尾计数，切片结果不是预期的中心 200x200 区域，而是尺寸错误的区域。以 (80,90,3) 为例，x1=-55、y1=-60，frame[-60:140, -55:145] 实际得到 60x55 的区域，与预期不符。这是当前代码在给定输入下即可说明的行为，属于 local_code。 反例检查：取 frame=np.zeros((80,90,3))：x1=(90-200)//2=-55，y1=(80-200)//2=-60，x2=145，y2=140。切片 frame[-60:140,-55:145] 中 -60 等价于 20、-55 等价于 35，得到 shape (60,55,3)，而非 200x200 或整图；说明负索引导致裁剪区域错误。"
+        },
+        {
+          "finding_id": 2,
+          "title": "preview_overlay 中 preview 尺寸大于 frame，赋值依赖广播且语义不清",
+          "status": "accepted",
+          "reason": "frame 形状为 (80,90,3)，frame[:100,:100] 因越界切片实际形状为 (80,90,3)，右侧 preview 为 (100,100,3)。NumPy 赋值要求形状可广播，尾部维度 90 与 100 不匹配，会抛出 ValueError，函数无法返回。候选对广播失败机制的描述正确，属于 local_code。 反例检查：frame=np.zeros((80,90,3))，preview=np.zeros((100,100,3))；frame[:100,:100] 的形状是 (80,90,3)，preview 是 (100,100,3)，90 与 100 不可广播，赋值会抛 ValueError: could not broadcast input array from shape (100,100,3) into shape (80,90,3)。"
+        },
+        {
+          "finding_id": 3,
+          "title": "train 中标签 y 为 int64，与二分类损失的类型约定不一致",
+          "status": "rejected",
+          "reason": "候选仅指出 y 为 int64 与 Keras 二分类损失“通常期望 float”的类型约定不一致，并承认多数版本会自动转换。这属于风格/可维护性偏好，未给出当前代码在给定环境下会失败或产生错误结果的具体机制；缺少 Keras 版本与后端证据，不能作为当前缺陷。"
+        }
+      ],
+      "limitations": [
+        "结论来自模型与静态证据，未执行代码或测试，仍可能存在误报和漏报。",
+        "未执行代码，crop 的负索引行为基于 Python/NumPy 切片语义推导，未实际运行验证。",
+        "preview_overlay 的广播错误基于 NumPy 广播规则推导，未实际运行确认具体异常信息。",
+        "Keras 版本未指定，train 中标签类型转换行为可能随版本变化。",
+        "静态检查工具（ruff、内置检查）未报告任何发现，不代表代码无缺陷。"
+      ],
+      "reflection_status": "completed",
+      "checks": {
+        "Python 语法与结构": "completed",
+        "内置 AST 规则": "completed",
+        "Ruff 静态检查": "completed"
+      },
+      "events": [
+        {
+          "stage": "输入校验",
+          "detail": "performance_fixture.py · Python · 30 行 · 快照 38cef250f458"
+        },
+        {
+          "stage": "工具规划",
+          "detail": "第 1 轮：模型选择下一步工具。"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "read_source · 结果已返回"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "parse_structure · 结果已返回"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "run_static_checks · 结果已返回"
+        },
+        {
+          "stage": "工具规划",
+          "detail": "第 2 轮：模型选择下一步工具。"
+        },
+        {
+          "stage": "生成初审",
+          "detail": "结合代码快照与已有证据整理候选问题。"
+        },
+        {
+          "stage": "证据校验",
+          "detail": "3 条候选有可定位证据；其余候选隔离或删除。"
+        },
+        {
+          "stage": "反思复核",
+          "detail": "逐条检查反例、触发条件、影响和建议，决定保留、待确认或删除。"
+        },
+        {
+          "stage": "报告完成",
+          "detail": "保留 2 条问题与建议，0 条待确认；摘要按最终结果重建。"
+        }
+      ],
+      "metrics": {
+        "model_calls": 4,
+        "http_attempts": 4,
+        "tool_calls": 3,
+        "prompt_tokens": 8784,
+        "completion_tokens": 3533,
+        "elapsed_seconds": 17.04
+      },
+      "created_at": "2026-09-28T08:49:25.919524+00:00"
+    },
+    "calls": [
+      {
+        "call": 1,
+        "seconds": 1.189,
+        "request_characters": 1247,
+        "tools_available": true,
+        "prompt_tokens": 1071,
+        "completion_tokens": 97,
+        "http_attempts": 1
+      },
+      {
+        "call": 2,
+        "seconds": 5.008,
+        "request_characters": 3891,
+        "tools_available": true,
+        "prompt_tokens": 1805,
+        "completion_tokens": 1048,
+        "http_attempts": 1
+      },
+      {
+        "call": 3,
+        "seconds": 5.64,
+        "request_characters": 6803,
+        "tools_available": false,
+        "prompt_tokens": 2397,
+        "completion_tokens": 1185,
+        "http_attempts": 1
+      },
+      {
+        "call": 4,
+        "seconds": 4.991,
+        "request_characters": 9730,
+        "tools_available": false,
+        "prompt_tokens": 3511,
+        "completion_tokens": 1203,
+        "http_attempts": 1
+      }
+    ]
+  },
+  {
+    "version": "after",
+    "repeat": 1,
+    "source_hash": "38cef250f458",
+    "filename": "performance_fixture.py",
+    "engine_root": "D:\\大三上课程\\软件工程项目实践",
+    "model": "deepseek-flash",
+    "report": {
+      "schema_version": 3,
+      "filename": "performance_fixture.py",
+      "language": "python",
+      "source_hash": "38cef250f458",
+      "mode": "deepseek",
+      "model": "deepseek-flash",
+      "strategy": "full",
+      "summary": "本次保留 1 条问题与建议（静态规则命中 0 条，模型复核支持 1 条），另有 3 条待确认。源码引用及工具来源已检查；未执行被审查代码，结论仍需结合实际测试。",
+      "findings": [
+        {
+          "title": "preview_overlay 中 frame[:100, :100] = preview 形状不匹配，赋值会抛 ValueError",
+          "severity": "high",
+          "category": "Bug",
+          "line_start": 29,
+          "line_end": 29,
+          "explanation": "frame 形状为 (80, 90, 3)，frame[:100, :100] 按 NumPy 切片裁剪后实际形状是 (80, 90, 3)；preview 形状为 (100, 100, 3)。把 (100,100,3) 广播赋值到 (80,90,3) 不合法（80 与 100、90 与 100 均不可广播），运行到第 29 行必然抛出 ValueError: could not broadcast input array。",
+          "suggestion": "让目标区域与源形状一致，例如把 preview 改为 np.zeros((80, 90, 3))，或改为 frame[:80, :90] = preview[:80, :90]；若本意是叠加到更大画布，应先把 frame 放到 preview 的对应位置。",
+          "evidence": "frame[:100, :100] = preview",
+          "rule_id": "",
+          "verification": "reviewed",
+          "review_note": "frame 形状 (80,90,3)，frame[:100,:100] 仍为 (80,90,3)，无法广播接收 (100,100,3) 的 preview，第29行必然抛 ValueError。",
+          "trigger": "",
+          "impact": "",
+          "verification_hint": ""
+        }
+      ],
+      "pending_findings": [
+        {
+          "title": "crop 未校验 frame 尺寸，小于 box_size 时返回空 ROI 且不报错",
+          "severity": "medium",
+          "category": "异常处理",
+          "line_start": 20,
+          "line_end": 20,
+          "explanation": "box_size 固定为 200，当 frame 的高或宽小于 200 时，(width-200)//2 为负，x1 为负、x2=x1+200 仍小于 200，切片被裁剪后可能得到空数组（如 100x100 输入得到 0 行或 0 列），后续使用 ROI 的代码会静默拿到空数据而非明确错误。",
+          "suggestion": "在切片前校验 height/width >= box_size，不满足时抛出明确异常或按比例缩放 box_size；也可断言 roi.size > 0 以便尽早暴露问题。",
+          "evidence": "x1, y1 = (width - box_size) // 2, (height - box_size) // 2",
+          "rule_id": "",
+          "verification": "pending",
+          "review_note": "fact_2：源码绑定的切片算例得到 [40, 20, 3]，empty=False。正尺寸下的空 ROI 崩溃结论与该计算不符；需说明其他可达触发条件，不能列为已复核问题。",
+          "trigger": "",
+          "impact": "",
+          "verification_hint": "核对源码引用、触发条件及所需上下文后再确认；当前未执行测试。"
+        },
+        {
+          "title": "train 中 y 为整型标签，与 sigmoid 输出配合时建议显式指定 dtype",
+          "severity": "low",
+          "category": "可维护性",
+          "line_start": 10,
+          "line_end": 10,
+          "explanation": "y = np.arange(700) % 2 得到 int64 数组，Keras 通常能自动处理二分类整型标签，但依赖框架隐式转换；若后续换成其他后端或自定义 loss，可能因 dtype 不一致报错或行为变化。",
+          "suggestion": "显式写成 y = (np.arange(700) % 2).astype(np.float32)，使标签 dtype 与 sigmoid 输出一致，减少隐式转换依赖。",
+          "evidence": "y = np.arange(700) % 2",
+          "rule_id": "",
+          "verification": "pending",
+          "review_note": "低优先级候选未进行语义复核，作为可选建议待确认。",
+          "trigger": "",
+          "impact": "",
+          "verification_hint": "核对源码引用、触发条件及所需上下文后再确认；当前未执行测试。"
+        },
+        {
+          "title": "crop 对非 ndarray 输入直接访问 shape 会抛 AttributeError",
+          "severity": "low",
+          "category": "异常处理",
+          "line_start": 18,
+          "line_end": 18,
+          "explanation": "frame.shape[:2] 假定输入是 NumPy 数组；若传入 PIL Image、list 或 None，会抛出 AttributeError/TypeError，且错误信息不指向调用方语义。属于接口健壮性问题，非必然缺陷。",
+          "suggestion": "在函数开头做类型/形状检查（如 np.asarray 转换或显式 raise TypeError），并在文档字符串中说明期望的输入形状与 dtype。",
+          "evidence": "height, width = frame.shape[:2]",
+          "rule_id": "",
+          "verification": "pending",
+          "review_note": "低优先级候选未进行语义复核，作为可选建议待确认。",
+          "trigger": "",
+          "impact": "",
+          "verification_hint": "核对源码引用、触发条件及所需上下文后再确认；当前未执行测试。"
+        }
+      ],
+      "verification_records": [
+        {
+          "finding_id": 1,
+          "title": "preview_overlay 中 frame[:100, :100] = preview 形状不匹配，赋值会抛 ValueError",
+          "status": "relocated",
+          "reason": "按原样证据将 L27–L29 校正为 L29–L29。"
+        },
+        {
+          "finding_id": 2,
+          "title": "crop 未校验 frame 尺寸，小于 box_size 时返回空 ROI 且不报错",
+          "status": "relocated",
+          "reason": "按原样证据将 L17–L23 校正为 L20–L20。"
+        },
+        {
+          "finding_id": 4,
+          "title": "train 中 y 为整型标签，与 sigmoid 输出配合时建议显式指定 dtype",
+          "status": "relocated",
+          "reason": "按原样证据将 L10–L13 校正为 L10–L10。"
+        },
+        {
+          "finding_id": 1,
+          "title": "preview_overlay 中 frame[:100, :100] = preview 形状不匹配，赋值会抛 ValueError",
+          "status": "accepted",
+          "reason": "frame 形状 (80,90,3)，frame[:100,:100] 仍为 (80,90,3)，无法广播接收 (100,100,3) 的 preview，第29行必然抛 ValueError。"
+        },
+        {
+          "finding_id": 2,
+          "title": "crop 未校验 frame 尺寸，小于 box_size 时返回空 ROI 且不报错",
+          "status": "pending",
+          "reason": "fact_2：源码绑定的切片算例得到 [40, 20, 3]，empty=False。正尺寸下的空 ROI 崩溃结论与该计算不符；需说明其他可达触发条件，不能列为已复核问题。"
+        },
+        {
+          "finding_id": 3,
+          "title": "crop 对非 ndarray 输入直接访问 shape 会抛 AttributeError",
+          "status": "pending",
+          "reason": "低优先级候选未进行语义复核，作为可选建议待确认。"
+        },
+        {
+          "finding_id": 4,
+          "title": "train 中 y 为整型标签，与 sigmoid 输出配合时建议显式指定 dtype",
+          "status": "pending",
+          "reason": "低优先级候选未进行语义复核，作为可选建议待确认。"
+        }
+      ],
+      "semantic_facts": [
+        {
+          "id": "fact_1",
+          "kind": "keras_validation_split",
+          "line_start": 13,
+          "line_end": 13,
+          "active": true,
+          "fraction": 0.2,
+          "statement": "Keras Model.fit 对 NumPy/张量输入使用 validation_split 时，先取末尾样本作验证，再打乱训练部分；验证部分不用于本次 fit 的训练。validation_data 非空时覆盖 validation_split。同源不等于样本重叠或泄漏，也不能单凭同源断言指标虚高；独立测试集是另一个评估问题。",
+          "source_url": "https://keras.io/api/models/model_training_apis/#fit-method",
+          "scope": "API 合同知识，假设标准 Keras 方法未被替换；不证明数据无重复、预处理无泄漏或没有额外训练。"
+        },
+        {
+          "id": "fact_2",
+          "kind": "centered_roi",
+          "line_start": 18,
+          "line_end": 22,
+          "box_size": 200,
+          "sample_frame_shape": [
+            120,
+            160,
+            3
+          ],
+          "sample": {
+            "shape": [
+              40,
+              20,
+              3
+            ],
+            "empty": false,
+            "normalized_slices": [
+              [
+                80,
+                120,
+                1
+              ],
+              [
+                140,
+                160,
+                1
+              ]
+            ],
+            "scope": "给定整数形状与基本切片的计算，不验证模型提供的参数是否对应源码。"
+          },
+          "statement": "对正尺寸 NumPy 数组和正 box_size，此固定中心公式的基本切片非空；负起点可能使区域偏离预期中心。",
+          "scope": "依赖 NumPy 基本切片语义；不涵盖零尺寸、非数组对象或其他预处理错误。"
+        }
+      ],
+      "calculations": [],
+      "limitations": [
+        "源码事实与静态规则有适用条件；未执行代码或测试，模型复核仍可能误报或漏报。",
+        "静态检查（Ruff）未报告问题，但不覆盖运行时形状/广播错误。",
+        "未执行代码，preview_overlay 的广播失败结论基于 NumPy 广播规则推导。",
+        "crop 的实际调用方与 frame 真实尺寸不在本文件内，空 ROI 风险为条件性。"
+      ],
+      "reflection_status": "completed",
+      "checks": {
+        "Python 语法与结构": "completed",
+        "内置 AST 规则": "completed",
+        "Ruff 静态检查": "completed"
+      },
+      "events": [
+        {
+          "stage": "输入校验",
+          "detail": "performance_fixture.py · Python · 30 行 · 快照 38cef250f458"
+        },
+        {
+          "stage": "源码事实核对",
+          "detail": "提取 2 条计算/API 事实；未执行被审查代码。"
+        },
+        {
+          "stage": "工具规划",
+          "detail": "第 1 轮：可继续调用工具，也可直接输出报告 JSON。"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "parse_structure · 结果已返回"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "run_static_checks · 结果已返回"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "check_semantics · 结果已返回"
+        },
+        {
+          "stage": "工具反馈与初审",
+          "detail": "第 2 轮：可继续调用工具，也可直接输出报告 JSON。"
+        },
+        {
+          "stage": "证据校验",
+          "detail": "1 条高/中优先级候选进入语义复核；低优先级工具发现直接保留，其余低优先级意见待确认。"
+        },
+        {
+          "stage": "反思复核",
+          "detail": "按事实逐条返回简短裁决，仅修正必要字段。"
+        },
+        {
+          "stage": "报告完成",
+          "detail": "保留 1 条问题与建议，3 条待确认。"
+        }
+      ],
+      "metrics": {
+        "model_calls": 3,
+        "http_attempts": 3,
+        "tool_calls": 3,
+        "prompt_tokens": 8760,
+        "completion_tokens": 1072,
+        "elapsed_seconds": 6.29,
+        "stages": [
+          {
+            "stage": "源码事实核对",
+            "kind": "local",
+            "elapsed_seconds": 0.002,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "工具规划",
+            "kind": "model",
+            "elapsed_seconds": 0.855,
+            "model_calls": 1,
+            "http_attempts": 1,
+            "prompt_tokens": 3173,
+            "completion_tokens": 62,
+            "status": "completed"
+          },
+          {
+            "stage": "parse_structure",
+            "kind": "tool",
+            "elapsed_seconds": 0.001,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "run_static_checks",
+            "kind": "tool",
+            "elapsed_seconds": 0.181,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "check_semantics",
+            "kind": "tool",
+            "elapsed_seconds": 0.0,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "工具反馈与初审",
+            "kind": "model",
+            "elapsed_seconds": 4.446,
+            "model_calls": 1,
+            "http_attempts": 1,
+            "prompt_tokens": 3426,
+            "completion_tokens": 925,
+            "status": "completed"
+          },
+          {
+            "stage": "证据校验",
+            "kind": "local",
+            "elapsed_seconds": 0.005,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "反思复核",
+            "kind": "model",
+            "elapsed_seconds": 0.8,
+            "model_calls": 1,
+            "http_attempts": 1,
+            "prompt_tokens": 2161,
+            "completion_tokens": 85,
+            "status": "completed"
+          },
+          {
+            "stage": "报告整理",
+            "kind": "local",
+            "elapsed_seconds": 0.0,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          }
+        ]
+      },
+      "created_at": "2026-09-28T08:49:33.464107+00:00"
+    },
+    "calls": [
+      {
+        "call": 1,
+        "seconds": 0.854,
+        "request_characters": 5235,
+        "tools_available": true,
+        "prompt_tokens": 3173,
+        "completion_tokens": 62,
+        "http_attempts": 1
+      },
+      {
+        "call": 2,
+        "seconds": 4.446,
+        "request_characters": 6628,
+        "tools_available": true,
+        "prompt_tokens": 3426,
+        "completion_tokens": 925,
+        "http_attempts": 1
+      },
+      {
+        "call": 3,
+        "seconds": 0.8,
+        "request_characters": 5913,
+        "tools_available": false,
+        "prompt_tokens": 2161,
+        "completion_tokens": 85,
+        "http_attempts": 1
+      }
+    ]
+  },
+  {
+    "version": "after",
+    "repeat": 2,
+    "source_hash": "38cef250f458",
+    "filename": "performance_fixture.py",
+    "engine_root": "D:\\大三上课程\\软件工程项目实践",
+    "model": "deepseek-flash",
+    "report": {
+      "schema_version": 3,
+      "filename": "performance_fixture.py",
+      "language": "python",
+      "source_hash": "38cef250f458",
+      "mode": "deepseek",
+      "model": "deepseek-flash",
+      "strategy": "full",
+      "summary": "本次保留 1 条问题与建议（静态规则命中 0 条，模型复核支持 1 条），另有 2 条待确认。源码引用及工具来源已检查；未执行被审查代码，结论仍需结合实际测试。",
+      "findings": [
+        {
+          "title": "preview_overlay 中 frame[:100, :100] 越界赋值，形状不匹配会抛 ValueError",
+          "severity": "high",
+          "category": "Bug",
+          "line_start": 29,
+          "line_end": 29,
+          "explanation": "frame 形状为 (80, 90, 3)，而 preview 为 (100, 100, 3)。frame[:100, :100] 按 NumPy 切片语义被裁剪为 (80, 90, 3)，无法把 (100, 100, 3) 广播进去，赋值时必然抛出 ValueError: could not broadcast input array from shape (100,100,3) into shape (80,90,3)。这是确定性崩溃，不是条件性风险。",
+          "suggestion": "让目标区域与源形状一致，例如 frame[:] = preview[:80, :90]，或先按 frame 尺寸裁剪 preview：frame[:, :] = preview[:frame.shape[0], :frame.shape[1]]；若意图是放大画布，应显式创建 (100,100,3) 的数组再赋值。",
+          "evidence": "frame[:100, :100] = preview",
+          "rule_id": "",
+          "verification": "reviewed",
+          "review_note": "frame 为 (80,90,3)，frame[:100,:100] 被裁剪为 (80,90,3)，无法广播 (100,100,3) 的 preview，赋值必然抛 ValueError。",
+          "trigger": "",
+          "impact": "",
+          "verification_hint": ""
+        }
+      ],
+      "pending_findings": [
+        {
+          "title": "crop 对小于 box_size 的帧产生负起点，返回区域偏离中心且可能为空",
+          "severity": "medium",
+          "category": "Bug",
+          "line_start": 20,
+          "line_end": 20,
+          "explanation": "当 width 或 height 小于 200 时，(width-200)//2 为负，例如 frame 形状 (120,160,3) 时 x1=-20、y1=-40，切片 frame[-40:160, -20:180] 会按负索引解释，取到的是右下角而非中心区域；若尺寸更小（如 100x100），x1=-50、x2=150，切片仍非空但完全偏离预期中心，甚至可能得到空数组。函数未对尺寸做任何校验。",
+          "suggestion": "在计算前校验 height/width >= box_size，否则抛出明确异常或先缩放/填充；也可用 max(0, ...) 并同步调整 x2/y2，保证 ROI 始终位于帧内且尺寸正确。",
+          "evidence": "x1, y1 = (width - box_size) // 2, (height - box_size) // 2",
+          "rule_id": "",
+          "verification": "pending",
+          "review_note": "fact_2：源码绑定的切片算例得到 [40, 20, 3]，empty=False。正尺寸下的空 ROI 崩溃结论与该计算不符；需说明其他可达触发条件，不能列为已复核问题。",
+          "trigger": "",
+          "impact": "",
+          "verification_hint": "核对源码引用、触发条件及所需上下文后再确认；当前未执行测试。"
+        },
+        {
+          "title": "train 中 y 为整型标签且未指定 batch_size，行为依赖默认值",
+          "severity": "low",
+          "category": "可维护性",
+          "line_start": 10,
+          "line_end": 10,
+          "explanation": "y = np.arange(700) % 2 生成 int64 标签，配合 sigmoid + binary_crossentropy 通常可被 Keras 接受，但依赖框架的隐式类型转换；同时 fit 未指定 batch_size，训练行为随 Keras 默认值变化。这些不是确定的缺陷，但会降低可复现性。",
+          "suggestion": "显式写出 y = (np.arange(700) % 2).astype(np.float32)，并在 fit 中显式指定 batch_size，使训练配置自描述、可复现。",
+          "evidence": "y = np.arange(700) % 2",
+          "rule_id": "",
+          "verification": "pending",
+          "review_note": "低优先级候选未进行语义复核，作为可选建议待确认。",
+          "trigger": "",
+          "impact": "",
+          "verification_hint": "核对源码引用、触发条件及所需上下文后再确认；当前未执行测试。"
+        }
+      ],
+      "verification_records": [
+        {
+          "finding_id": 1,
+          "title": "preview_overlay 中 frame[:100, :100] 越界赋值，形状不匹配会抛 ValueError",
+          "status": "relocated",
+          "reason": "按原样证据将 L27–L29 校正为 L29–L29。"
+        },
+        {
+          "finding_id": 2,
+          "title": "crop 对小于 box_size 的帧产生负起点，返回区域偏离中心且可能为空",
+          "status": "relocated",
+          "reason": "按原样证据将 L18–L22 校正为 L20–L20。"
+        },
+        {
+          "finding_id": 3,
+          "title": "train 中 y 为整型标签且未指定 batch_size，行为依赖默认值",
+          "status": "relocated",
+          "reason": "按原样证据将 L9–L13 校正为 L10–L10。"
+        },
+        {
+          "finding_id": 1,
+          "title": "preview_overlay 中 frame[:100, :100] 越界赋值，形状不匹配会抛 ValueError",
+          "status": "accepted",
+          "reason": "frame 为 (80,90,3)，frame[:100,:100] 被裁剪为 (80,90,3)，无法广播 (100,100,3) 的 preview，赋值必然抛 ValueError。"
+        },
+        {
+          "finding_id": 2,
+          "title": "crop 对小于 box_size 的帧产生负起点，返回区域偏离中心且可能为空",
+          "status": "pending",
+          "reason": "fact_2：源码绑定的切片算例得到 [40, 20, 3]，empty=False。正尺寸下的空 ROI 崩溃结论与该计算不符；需说明其他可达触发条件，不能列为已复核问题。"
+        },
+        {
+          "finding_id": 3,
+          "title": "train 中 y 为整型标签且未指定 batch_size，行为依赖默认值",
+          "status": "pending",
+          "reason": "低优先级候选未进行语义复核，作为可选建议待确认。"
+        }
+      ],
+      "semantic_facts": [
+        {
+          "id": "fact_1",
+          "kind": "keras_validation_split",
+          "line_start": 13,
+          "line_end": 13,
+          "active": true,
+          "fraction": 0.2,
+          "statement": "Keras Model.fit 对 NumPy/张量输入使用 validation_split 时，先取末尾样本作验证，再打乱训练部分；验证部分不用于本次 fit 的训练。validation_data 非空时覆盖 validation_split。同源不等于样本重叠或泄漏，也不能单凭同源断言指标虚高；独立测试集是另一个评估问题。",
+          "source_url": "https://keras.io/api/models/model_training_apis/#fit-method",
+          "scope": "API 合同知识，假设标准 Keras 方法未被替换；不证明数据无重复、预处理无泄漏或没有额外训练。"
+        },
+        {
+          "id": "fact_2",
+          "kind": "centered_roi",
+          "line_start": 18,
+          "line_end": 22,
+          "box_size": 200,
+          "sample_frame_shape": [
+            120,
+            160,
+            3
+          ],
+          "sample": {
+            "shape": [
+              40,
+              20,
+              3
+            ],
+            "empty": false,
+            "normalized_slices": [
+              [
+                80,
+                120,
+                1
+              ],
+              [
+                140,
+                160,
+                1
+              ]
+            ],
+            "scope": "给定整数形状与基本切片的计算，不验证模型提供的参数是否对应源码。"
+          },
+          "statement": "对正尺寸 NumPy 数组和正 box_size，此固定中心公式的基本切片非空；负起点可能使区域偏离预期中心。",
+          "scope": "依赖 NumPy 基本切片语义；不涵盖零尺寸、非数组对象或其他预处理错误。"
+        }
+      ],
+      "calculations": [],
+      "limitations": [
+        "源码事实与静态规则有适用条件；未执行代码或测试，模型复核仍可能误报或漏报。",
+        "静态检查（Ruff/内置规则）未报告任何发现，但不代表代码无缺陷。",
+        "未执行代码或测试，越界赋值与负索引行为基于 NumPy 广播/切片语义推导。",
+        "crop 的实际输入帧尺寸未知，负起点问题为条件性触发（帧任一边小于 200 时）。"
+      ],
+      "reflection_status": "completed",
+      "checks": {
+        "Python 语法与结构": "completed",
+        "内置 AST 规则": "completed",
+        "Ruff 静态检查": "completed"
+      },
+      "events": [
+        {
+          "stage": "输入校验",
+          "detail": "performance_fixture.py · Python · 30 行 · 快照 38cef250f458"
+        },
+        {
+          "stage": "源码事实核对",
+          "detail": "提取 2 条计算/API 事实；未执行被审查代码。"
+        },
+        {
+          "stage": "工具规划",
+          "detail": "第 1 轮：可继续调用工具，也可直接输出报告 JSON。"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "parse_structure · 结果已返回"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "run_static_checks · 结果已返回"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "check_semantics · 结果已返回"
+        },
+        {
+          "stage": "工具反馈与初审",
+          "detail": "第 2 轮：可继续调用工具，也可直接输出报告 JSON。"
+        },
+        {
+          "stage": "证据校验",
+          "detail": "1 条高/中优先级候选进入语义复核；低优先级工具发现直接保留，其余低优先级意见待确认。"
+        },
+        {
+          "stage": "反思复核",
+          "detail": "按事实逐条返回简短裁决，仅修正必要字段。"
+        },
+        {
+          "stage": "报告完成",
+          "detail": "保留 1 条问题与建议，2 条待确认。"
+        }
+      ],
+      "metrics": {
+        "model_calls": 3,
+        "http_attempts": 3,
+        "tool_calls": 3,
+        "prompt_tokens": 8763,
+        "completion_tokens": 968,
+        "elapsed_seconds": 5.77,
+        "stages": [
+          {
+            "stage": "源码事实核对",
+            "kind": "local",
+            "elapsed_seconds": 0.001,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "工具规划",
+            "kind": "model",
+            "elapsed_seconds": 0.671,
+            "model_calls": 1,
+            "http_attempts": 1,
+            "prompt_tokens": 3173,
+            "completion_tokens": 62,
+            "status": "completed"
+          },
+          {
+            "stage": "parse_structure",
+            "kind": "tool",
+            "elapsed_seconds": 0.001,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "run_static_checks",
+            "kind": "tool",
+            "elapsed_seconds": 0.177,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "check_semantics",
+            "kind": "tool",
+            "elapsed_seconds": 0.0,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "工具反馈与初审",
+            "kind": "model",
+            "elapsed_seconds": 4.102,
+            "model_calls": 1,
+            "http_attempts": 1,
+            "prompt_tokens": 3426,
+            "completion_tokens": 823,
+            "status": "completed"
+          },
+          {
+            "stage": "证据校验",
+            "kind": "local",
+            "elapsed_seconds": 0.003,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          },
+          {
+            "stage": "反思复核",
+            "kind": "model",
+            "elapsed_seconds": 0.811,
+            "model_calls": 1,
+            "http_attempts": 1,
+            "prompt_tokens": 2164,
+            "completion_tokens": 83,
+            "status": "completed"
+          },
+          {
+            "stage": "报告整理",
+            "kind": "local",
+            "elapsed_seconds": 0.0,
+            "model_calls": 0,
+            "http_attempts": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "status": "completed"
+          }
+        ]
+      },
+      "created_at": "2026-09-28T08:49:40.494032+00:00"
+    },
+    "calls": [
+      {
+        "call": 1,
+        "seconds": 0.671,
+        "request_characters": 5235,
+        "tools_available": true,
+        "prompt_tokens": 3173,
+        "completion_tokens": 62,
+        "http_attempts": 1
+      },
+      {
+        "call": 2,
+        "seconds": 4.102,
+        "request_characters": 6628,
+        "tools_available": true,
+        "prompt_tokens": 3426,
+        "completion_tokens": 823,
+        "http_attempts": 1
+      },
+      {
+        "call": 3,
+        "seconds": 0.81,
+        "request_characters": 5950,
+        "tools_available": false,
+        "prompt_tokens": 2164,
+        "completion_tokens": 83,
+        "http_attempts": 1
+      }
+    ]
+  },
+  {
+    "version": "before",
+    "repeat": 2,
+    "source_hash": "38cef250f458",
+    "filename": "performance_fixture.py",
+    "engine_root": "D:\\大三上课程\\软件工程项目实践\\reports\\baseline_v2",
+    "model": "deepseek-flash",
+    "report": {
+      "schema_version": 2,
+      "filename": "performance_fixture.py",
+      "language": "python",
+      "source_hash": "38cef250f458",
+      "mode": "deepseek",
+      "model": "deepseek-flash",
+      "strategy": "full",
+      "summary": "本次保留 2 条问题与建议（静态规则命中 0 条，模型复核支持 2 条），另有 0 条待确认。源码引用及工具来源已检查；未执行被审查代码，结论仍需结合实际测试。",
+      "findings": [
+        {
+          "title": "preview_overlay 中向 80x90 数组写入 100x100 数据导致广播赋值失败",
+          "severity": "high",
+          "category": "Bug",
+          "line_start": 29,
+          "line_end": 29,
+          "explanation": "触发条件：调用 preview_overlay()，执行第 29 行 frame[:100, :100] = preview。\n影响：NumPy 广播赋值失败，抛出 ValueError，函数无法返回结果。",
+          "suggestion": "只赋值重叠区域，例如 h=min(frame.shape[0],preview.shape[0]); w=min(frame.shape[1],preview.shape[1]); frame[:h,:w]=preview[:h,:w]；或先校验尺寸并显式报错。",
+          "evidence": "frame[:100, :100] = preview",
+          "rule_id": "",
+          "verification": "reviewed",
+          "review_note": "frame 形状 (80,90,3)，切片 frame[:100,:100] 越界被裁剪为 (80,90,3)，右侧 preview 为 (100,100,3)，NumPy 赋值无法广播，必然抛 ValueError。机制与证据均来自本文件，成立。 反例检查：算例：frame=np.zeros((80,90,3))，preview=np.zeros((100,100,3))，frame[:100,:100]=preview。左侧切片实际形状 (80,90,3)，右侧 (100,100,3)，广播失败，抛 ValueError: could not broadcast input array from shape (100,100,3) into shape (80,90,3)。结论：原候选成立。",
+          "trigger": "调用 preview_overlay()，执行第 29 行 frame[:100, :100] = preview。",
+          "impact": "NumPy 广播赋值失败，抛出 ValueError，函数无法返回结果。",
+          "verification_hint": "在 Python 中构造 frame=np.zeros((80,90,3),dtype=np.uint8)、preview=np.zeros((100,100,3),dtype=np.uint8)，执行 frame[:100,:100]=preview，观察是否抛出 ValueError 及形状信息。"
+        },
+        {
+          "title": "crop 在图像尺寸小于 box_size 时产生负索引，ROI 尺寸错误",
+          "severity": "medium",
+          "category": "Bug",
+          "line_start": 20,
+          "line_end": 20,
+          "explanation": "触发条件：调用 crop(frame)，且 frame 的 height 或 width 小于 box_size=200。\n影响：返回的 ROI 尺寸和位置与预期中心裁剪不符（如 (60,55,3) 而非 200x200），后续依赖固定尺寸的处理会得到错误输入。",
+          "suggestion": "裁剪前校验 if height < box_size or width < box_size: raise ValueError(...)，或对起始坐标取 max(0, ...) 并相应调整结束坐标。",
+          "evidence": "x1, y1 = (width - box_size) // 2, (height - box_size) // 2",
+          "rule_id": "",
+          "verification": "reviewed",
+          "review_note": "当 height 或 width 小于 200 时，(width-box_size)//2 为负，负索引在切片中从末尾计数，导致 ROI 位置和尺寸与“中心 200x200”意图不符。以 (80,90,3) 为例得到 (60,55,3)，机制与算例均可从本文件推出。 反例检查：算例：frame 形状 (80,90,3)，x1=(90-200)//2=-55，y1=(80-200)//2=-60，x2=145，y2=140；frame[-60:140,-55:145] 等价于 frame[20:80,35:90]，形状 (60,55,3)，非 200x200。结论：原候选成立。",
+          "trigger": "调用 crop(frame)，且 frame 的 height 或 width 小于 box_size=200。",
+          "impact": "返回的 ROI 尺寸和位置与预期中心裁剪不符（如 (60,55,3) 而非 200x200），后续依赖固定尺寸的处理会得到错误输入。",
+          "verification_hint": "构造 frame=np.zeros((80,90,3),dtype=np.uint8)，调用 crop(frame)，打印返回数组的 shape，观察是否为 (60,55,3) 而非 (200,200,3)。"
+        }
+      ],
+      "pending_findings": [],
+      "verification_records": [
+        {
+          "finding_id": 1,
+          "title": "preview_overlay 中向 80x90 数组写入 100x100 数据导致广播赋值失败",
+          "status": "relocated",
+          "reason": "按原样证据将 L27–L29 校正为 L29–L29。"
+        },
+        {
+          "finding_id": 2,
+          "title": "crop 在图像尺寸小于 box_size 时产生负索引，ROI 尺寸错误",
+          "status": "relocated",
+          "reason": "按原样证据将 L20–L22 校正为 L20–L20。"
+        },
+        {
+          "finding_id": 3,
+          "title": "train 中标签 y 为 int64 而输入 x 为 float32，类型不一致",
+          "status": "relocated",
+          "reason": "按原样证据将 L9–L10 校正为 L10–L10。"
+        },
+        {
+          "finding_id": 1,
+          "title": "preview_overlay 中向 80x90 数组写入 100x100 数据导致广播赋值失败",
+          "status": "accepted",
+          "reason": "frame 形状 (80,90,3)，切片 frame[:100,:100] 越界被裁剪为 (80,90,3)，右侧 preview 为 (100,100,3)，NumPy 赋值无法广播，必然抛 ValueError。机制与证据均来自本文件，成立。 反例检查：算例：frame=np.zeros((80,90,3))，preview=np.zeros((100,100,3))，frame[:100,:100]=preview。左侧切片实际形状 (80,90,3)，右侧 (100,100,3)，广播失败，抛 ValueError: could not broadcast input array from shape (100,100,3) into shape (80,90,3)。结论：原候选成立。"
+        },
+        {
+          "finding_id": 2,
+          "title": "crop 在图像尺寸小于 box_size 时产生负索引，ROI 尺寸错误",
+          "status": "accepted",
+          "reason": "当 height 或 width 小于 200 时，(width-box_size)//2 为负，负索引在切片中从末尾计数，导致 ROI 位置和尺寸与“中心 200x200”意图不符。以 (80,90,3) 为例得到 (60,55,3)，机制与算例均可从本文件推出。 反例检查：算例：frame 形状 (80,90,3)，x1=(90-200)//2=-55，y1=(80-200)//2=-60，x2=145，y2=140；frame[-60:140,-55:145] 等价于 frame[20:80,35:90]，形状 (60,55,3)，非 200x200。结论：原候选成立。"
+        },
+        {
+          "finding_id": 3,
+          "title": "train 中标签 y 为 int64 而输入 x 为 float32，类型不一致",
+          "status": "rejected",
+          "reason": "Keras 的 binary_crossentropy 接受整数标签，int64 标签与 float32 输入混用是常见且受支持的用法，不构成当前缺陷；原候选自身也承认“通常能处理”，属于风格/可读性偏好而非可说明的错误机制。"
+        }
+      ],
+      "limitations": [
+        "结论来自模型与静态证据，未执行代码或测试，仍可能存在误报和漏报。",
+        "未执行代码，无法验证 Keras 版本对整数标签的具体行为。",
+        "crop 函数未提供调用上下文，无法确认调用者是否已保证 frame 尺寸大于 box_size。",
+        "静态检查工具（ruff、内置检查）未报告任何问题，但不代表代码无缺陷。"
+      ],
+      "reflection_status": "completed",
+      "checks": {
+        "Python 语法与结构": "completed",
+        "内置 AST 规则": "completed",
+        "Ruff 静态检查": "completed"
+      },
+      "events": [
+        {
+          "stage": "输入校验",
+          "detail": "performance_fixture.py · Python · 30 行 · 快照 38cef250f458"
+        },
+        {
+          "stage": "工具规划",
+          "detail": "第 1 轮：模型选择下一步工具。"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "read_source · 结果已返回"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "parse_structure · 结果已返回"
+        },
+        {
+          "stage": "工具执行",
+          "detail": "run_static_checks · 结果已返回"
+        },
+        {
+          "stage": "工具规划",
+          "detail": "第 2 轮：模型选择下一步工具。"
+        },
+        {
+          "stage": "生成初审",
+          "detail": "结合代码快照与已有证据整理候选问题。"
+        },
+        {
+          "stage": "证据校验",
+          "detail": "3 条候选有可定位证据；其余候选隔离或删除。"
+        },
+        {
+          "stage": "反思复核",
+          "detail": "逐条检查反例、触发条件、影响和建议，决定保留、待确认或删除。"
+        },
+        {
+          "stage": "报告完成",
+          "detail": "保留 2 条问题与建议，0 条待确认；摘要按最终结果重建。"
+        }
+      ],
+      "metrics": {
+        "model_calls": 4,
+        "http_attempts": 4,
+        "tool_calls": 3,
+        "prompt_tokens": 8677,
+        "completion_tokens": 3421,
+        "elapsed_seconds": 16.26
+      },
+      "created_at": "2026-09-28T08:49:57.999637+00:00"
+    },
+    "calls": [
+      {
+        "call": 1,
+        "seconds": 0.889,
+        "request_characters": 1247,
+        "tools_available": true,
+        "prompt_tokens": 1071,
+        "completion_tokens": 98,
+        "http_attempts": 1
+      },
+      {
+        "call": 2,
+        "seconds": 5.871,
+        "request_characters": 3897,
+        "tools_available": true,
+        "prompt_tokens": 1806,
+        "completion_tokens": 1249,
+        "http_attempts": 1
+      },
+      {
+        "call": 3,
+        "seconds": 4.653,
+        "request_characters": 6803,
+        "tools_available": false,
+        "prompt_tokens": 2397,
+        "completion_tokens": 1039,
+        "http_attempts": 1
+      },
+      {
+        "call": 4,
+        "seconds": 4.687,
+        "request_characters": 9547,
+        "tools_available": false,
+        "prompt_tokens": 3403,
+        "completion_tokens": 1035,
+        "http_attempts": 1
+      }
+    ]
+  }
+]
