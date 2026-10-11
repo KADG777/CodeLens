@@ -1,5 +1,7 @@
 # CodeLens 代码审查 Agent
 
+[![CI](https://github.com/KADG777/CodeLens/actions/workflows/ci.yml/badge.svg)](https://github.com/KADG777/CodeLens/actions/workflows/ci.yml)
+
 CodeLens 是面向 Python / C++ 单文件的代码审查 Agent，使用 Python + Streamlit 构建，支持 DeepSeek API 和无需密钥的离线规则演示。它将模型分析、本地工具、源码证据校验和反思复核结合起来，输出可定位、带触发条件和修改建议的审查报告。
 
 项目用于软件工程课程实践，覆盖代码输入、模型决策、工具执行、结果反馈、报告输出和后续追问的完整流程。核心目标是让读者能够核对每条意见的依据，并区分静态规则诊断、模型复核意见和仍需补充上下文的假设。
@@ -231,6 +233,7 @@ CodeLens/
 ├── review_agent/             # 调度、模型、工具、证据、追问与报告
 ├── examples/                 # Python / C++ 问题与改进示例
 ├── tests/                    # 自动化回归测试
+├── .github/workflows/ci.yml   # GitHub Actions 持续集成
 ├── evals/                    # 合成评估输入与已交付的历史结果
 ├── docs/                     # 详细设计、验证指南与质量评估说明
 ├── record_demo.py            # 记录真实 API 的公开工具调用与报告
@@ -252,6 +255,23 @@ CodeLens/
 本仓库提供源码与文档；本地虚拟环境、密钥和日常运行生成的 `reports/` 不随 Git 提交，课程课件也不属于仓库内容。运行需要安装 Python 和依赖。
 
 ## 自动化测试与评估
+
+### GitHub Actions CI
+
+仓库通过 [CI 工作流](.github/workflows/ci.yml)自动验证每次推送到 `main` 的更新和 Pull Request，也支持在 [Actions 页面](https://github.com/KADG777/CodeLens/actions/workflows/ci.yml)点击 **Run workflow** 手动运行。README 顶部徽章显示该工作流的状态。
+
+| 检查 | 环境与内容 |
+|---|---|
+| Ruff | Ubuntu / Python 3.12，检查项目源码、测试与评估脚本 |
+| 完整回归 | Ubuntu、Windows × Python 3.11、3.12，共四组；包含 Streamlit 页面测试 |
+| 离线评估 | 每组测试通过后运行 `evaluate.py --demo`，验证 18 个 Python / C++ 合成输入的报告流程 |
+| 结果留存 | 每组上传 JUnit 测试报告与离线评估 JSON，保存 14 天；测试失败时仍尝试上传已生成的报告 |
+
+CI 不需要配置 API Key；模型相关测试使用模拟响应，离线评估的模型调用和 token 用量均为 0。依赖按 `requirements-dev.txt` 安装，pip 缓存随依赖文件更新；Action 固定到提交 SHA。工作流仅请求仓库读取权限，同一分支的新运行会取消旧运行。
+
+CI 用于验证代码规范、已覆盖场景和跨平台兼容性。通过 CI 不代表真实模型的通用准确率；如需将检查设为合并条件，需在 GitHub 分支规则中另行配置。查看某次运行的 jobs 和 Artifacts 可定位失败或下载结果，具体步骤见[验证指南](docs/VALIDATION_GUIDE.md#github-actions-持续集成)。
+
+### 本地测试与评估
 
 在本仓库根目录运行：
 

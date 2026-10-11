@@ -4,6 +4,21 @@
 
 2026-10-02 追问修正后的完整回归：**245 项通过**，Ruff 检查通过。两轮合成追问实测、此前主审工具循环演示及其版本范围见 [QUALITY_EVALUATION.md](QUALITY_EVALUATION.md)。重新运行时应以本机输出为准。
 
+## GitHub Actions 持续集成
+
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml)在推送到 `main`、提交或更新 Pull Request 时自动运行，也提供 `workflow_dispatch` 手动入口。包含一个 Ruff 检查任务和 Ubuntu / Windows × Python 3.11 / 3.12 的四个回归任务。
+
+各回归任务安装 `requirements-dev.txt`，执行完整 `pytest` 后再运行 18 例离线评估。包括 Streamlit `AppTest`、Tree-sitter C++ 和模拟 HTTP 的检查均在 CI 中执行，无需真实 API Key。环境中清空 `DEEPSEEK_API_KEY`，工作流不读取仓库密钥，也不运行真实 API 演示脚本。
+
+查看结果：
+
+1. 打开仓库的 [Actions → CI](https://github.com/KADG777/CodeLens/actions/workflows/ci.yml)，选择对应提交的运行。
+2. 查看 **Ruff** 和四个 **Tests** 任务；展开安装、回归或离线评估步骤可看到命令与输出。回归矩阵设置 `fail-fast: false`，便于同一次运行检查所有环境。
+3. 在运行页的 **Artifacts** 下载 `reports-<系统>-py<版本>`，内含 `pytest.xml` 与成功生成的 `eval-demo.json`，保留 14 天。测试失败时仍上传已生成的 JUnit；若安装阶段失败，可能没有报告。
+4. 手动复跑可点击 **Run workflow** 选择分支，或在失败的运行页重新运行失败任务。排查应使用该次运行的提交 SHA 和环境版本。
+
+每个回归任务最多运行 20 分钟，Ruff 最多 10 分钟。同一分支的新运行取消旧运行；依赖缓存依据运行/开发依赖文件更新。Action 固定到提交 SHA，工作流的 `GITHUB_TOKEN` 仅有仓库读取权限。CI 通过表示对应提交的自动化检查通过，不替代真实模型质量评估；GitHub 分支规则需要单独配置才能强制合并前检查。
+
 ## 安装与离线回归
 
 建议使用 Python 3.11 或 3.12。第一次先运行 `setup.ps1`，或手动安装：
